@@ -1,3 +1,4 @@
+import { TaskManager } from "../agent/task-manager";
 import type { ResolvedConfig } from "../config/load";
 import { HookRunner } from "../hooks/runner";
 import { loadMcpServers } from "../mcp/manager";
@@ -44,6 +45,7 @@ export class AgentDriver {
   private readonly skillsBlock: string;
   private mcpStatuses: McpServerStatus[] = [];
   private mcpClose: () => Promise<void> = async () => {};
+  private readonly taskManager = new TaskManager();
 
   constructor(private readonly opts: DriverOptions) {
     this.conversation = opts.history ?? [];
@@ -103,7 +105,13 @@ export class AgentDriver {
       permissionMode: c.permissionMode,
       sandbox: c.sandbox,
     });
-    const systemPrompt = [base, this.memory, this.skillsBlock].filter((s) => s.length > 0).join("\n\n");
+    const planDirective =
+      c.permissionMode === "plan"
+        ? "## Plan mode\nInvestigate, then propose a plan via the update_plan tool. Do NOT edit files or run state-changing commands until the plan is approved."
+        : "";
+    const systemPrompt = [base, this.memory, this.skillsBlock, planDirective]
+      .filter((s) => s.length > 0)
+      .join("\n\n");
     return run(
       {
         provider: this.provider,
@@ -111,6 +119,7 @@ export class AgentDriver {
         permissions: this.permissions,
         hooks: this.hooks,
         mcpServers: this.mcpStatuses,
+        taskManager: this.taskManager,
         systemPrompt,
         appendSystemPrompt: this.opts.appendSystemPrompt,
         maxTurns: c.maxTurns,

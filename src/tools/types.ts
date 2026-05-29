@@ -1,7 +1,13 @@
 import type { ZodType } from "zod";
 
+import type { TaskManager } from "../agent/task-manager";
 import type { ToolSource } from "../core/types";
 import type { ApprovalRequest, Decision, PermissionEffect, SandboxTier } from "../permissions/types";
+
+export interface SubagentResult {
+  text: string;
+  isError: boolean;
+}
 
 export interface Logger {
   debug(...args: unknown[]): void;
@@ -20,6 +26,10 @@ export interface ToolContext {
   requestApproval(req: ApprovalRequest): Promise<Decision>;
   agentId: string;
   logger: Logger;
+  /** Run a child agent loop to completion (provided by the engine). Excludes the Task tool. */
+  spawnSubagent?(opts: { prompt: string; allowedTools?: string[]; systemPrompt?: string }): Promise<SubagentResult>;
+  /** Session-scoped background task registry (for run_in_background Tasks). */
+  taskManager?: TaskManager;
 }
 
 export interface ToolPermissionSpec {

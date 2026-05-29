@@ -1,5 +1,5 @@
 import type { ApprovalRequest, Decision } from "../permissions/types";
-import type { OmcbEvent } from "./events";
+import type { OmcbEvent, PlanState } from "./events";
 
 export interface ToolCard {
   id: string;
@@ -31,6 +31,7 @@ export interface StoreState {
   status: "idle" | "streaming" | "error";
   /** Front of this queue is rendered as an approval modal; resolved via resolveApproval(). */
   approvalQueue: ApprovalRequest[];
+  plan: PlanState | null;
 }
 
 function initialState(): StoreState {
@@ -43,6 +44,7 @@ function initialState(): StoreState {
     busy: false,
     status: "idle",
     approvalQueue: [],
+    plan: null,
   };
 }
 
@@ -185,7 +187,7 @@ export class Store {
         }));
         break;
       case "plan":
-        // Plan panel arrives in M6.
+        this.set((s) => ({ ...s, plan: event.plan }));
         break;
     }
   }

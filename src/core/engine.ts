@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import type { TaskManager } from "../agent/task-manager";
 import type { HookRunner } from "../hooks/runner";
 import type { PermissionEngine } from "../permissions/engine";
 import type { SandboxTier } from "../permissions/types";
@@ -9,7 +10,7 @@ import type { Logger, ToolContext, ToolResultBlock } from "../tools/types";
 import { classifyApiError } from "./errors";
 import type { ErrorKind } from "./errors";
 import { usageToWire } from "./events";
-import type { McpServerStatus, OmcbEvent } from "./events";
+import type { McpServerStatus, OmcbEvent, PlanState } from "./events";
 import type {
   ContentBlock,
   FinalResult,
@@ -55,8 +56,12 @@ export interface AgentLoopConfig {
   writer?: { writeMessage(m: NormalizedMessage): void };
   hooks?: HookRunner;
   mcpServers?: McpServerStatus[];
+  taskManager?: TaskManager;
   logger?: Logger;
 }
+
+const SUBAGENT_PROMPT =
+  "You are a focused sub-agent spawned to complete one specific task. Use the available tools to do it, then report a concise result as your final message. You cannot spawn further sub-agents.";
 
 function newId(prefix: string): string {
   return `${prefix}_${randomUUID()}`;
@@ -107,11 +112,43 @@ function normalizeToolOutput(content: string | ToolResultBlock[]): string {
   return content.map((b) => (b.type === "text" ? b.text : `[image ${b.mimeType}]`)).join("\n");
 }
 
+/** Run a child agent loop to completion (block mode). Excludes the Task tools to bound recursion. */
+async function runSubagent(
+  cfg: AgentLoopConfig,
+  opts: { prompt: string; allowedTools?: string[]; systemPrompt?: string },
+  logger: Logger,
+): Promise<{ text: string; isError: boolean }> {
+  const base = opts.allowedTools ?? cfg.allowedTools ?? cfg.registry.names();
+  const allowed = base.filter((n) => n !== "Task" && n !== "task_status");
+  const childCfg: AgentLoopConfig = {
+    provider: cfg.provider,
+    registry: cfg.registry,
+    permissions: cfg.permissions,
+    systemPrompt: opts.systemPrompt ?? SUBAGENT_PROMPT,
+    maxTurns: Math.min(cfg.maxTurns, 15),
+    model: cfg.model,
+    maxTokens: cfg.maxTokens,
+    signal: cfg.signal,
+    sessionId: `${cfg.sessionId}/sub`,
+    workspace: cfg.workspace,
+    env: cfg.env,
+    sandbox: cfg.sandbox,
+    allowedTools: allowed,
+    logger,
+  };
+  const conversation: NormalizedMessage[] = [];
+  const gen = run(childCfg, { text: opts.prompt }, conversation);
+  let step = await gen.next();
+  while (!step.done) step = await gen.next();
+  const result = step.value;
+  return { text: result.text || "(no output)", isError: Boolean(result.errorKind) };
+}
+
 async function executeTool(
   cfg: AgentLoopConfig,
   call: ToolUseBlock,
   logger: Logger,
-): Promise<{ output: string; isError: boolean }> {
+): Promise<{ output: string; isError: boolean; plan?: PlanState }> {
   const tool = cfg.registry.get(call.name);
   if (!tool) return { output: `unknown tool: ${call.name}`, isError: true };
 
@@ -124,6 +161,8 @@ async function executeTool(
     requestApproval: (req) => cfg.permissions.prompter.prompt(req),
     agentId: ROOT_AGENT,
     logger,
+    spawnSubagent: (opts) => runSubagent(cfg, opts, logger),
+    ...(cfg.taskManager ? { taskManager: cfg.taskManager } : {}),
   };
 
   // PreToolUse hook runs BEFORE the permission gate: it can block or rewrite the call.
@@ -149,7 +188,9 @@ async function executeTool(
     const result = await tool.execute(data, ctx);
     const output = normalizeToolOutput(result.content);
     if (cfg.hooks) await cfg.hooks.postToolUse(call.name, data, output);
-    return { output, isError: result.isError ?? false };
+    const details = result.details as Record<string, unknown> | undefined;
+    const plan = details && "plan" in details ? (details.plan as PlanState) : undefined;
+    return { output, isError: result.isError ?? false, ...(plan ? { plan } : {}) };
   } catch (err) {
     logger.error("tool execution failed", call.name, err);
     return { output: `tool error: ${err instanceof Error ? err.message : String(err)}`, isError: true };
@@ -375,6 +416,7 @@ export async function* run(
       const tu = toolUses[i]!;
       const r = results[i]!;
       yield { type: "tool_result", tool_id: tu.id, name: tu.name, output: r.output, is_error: r.isError };
+      if (r.plan) yield { type: "plan", plan: r.plan };
       toolResultBlocks.push({ type: "tool_result", toolUseId: tu.id, output: r.output, isError: r.isError });
     }
     const toolResultMessage: NormalizedMessage = {

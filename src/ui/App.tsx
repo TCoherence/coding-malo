@@ -59,6 +59,24 @@ function RunningTool({ tool }: { tool: ToolCard }): ReactElement {
   );
 }
 
+function PlanPanel({ state }: { state: StoreState }): ReactElement | null {
+  const plan = state.plan;
+  if (!plan || plan.items.length === 0) return null;
+  const icon = (s: string): string => (s === "completed" ? "✔" : s === "in_progress" ? "▸" : "○");
+  const color = (s: string): string => (s === "completed" ? "green" : s === "in_progress" ? "yellow" : "gray");
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <Text bold>{plan.title ? `Plan: ${plan.title}` : "Plan"}</Text>
+      {plan.items.map((it) => (
+        <Text key={it.id} color={color(it.status)}>
+          {"  "}
+          {icon(it.status)} {it.text}
+        </Text>
+      ))}
+    </Box>
+  );
+}
+
 function Footer({ state }: { state: StoreState }): ReactElement {
   const h = state.header;
   const u = state.usage;
@@ -156,6 +174,7 @@ export function App({
       {state.liveTools.map((t) => (
         <RunningTool key={t.id} tool={t} />
       ))}
+      <PlanPanel state={state} />
       <Footer state={state} />
       {pendingApproval ? (
         <ApprovalModal req={pendingApproval} />
