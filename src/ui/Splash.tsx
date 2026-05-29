@@ -51,9 +51,9 @@ export function Splash({
 
   useInput(() => finish()); // any key skips the splash
 
-  const rows = process.stdout.rows ?? 24;
+  // Inline (no alt screen): render at the cursor, horizontally centered; runSplash erases it after.
   return (
-    <Box flexDirection="column" minHeight={rows} alignItems="center" justifyContent="center">
+    <Box flexDirection="column" alignItems="center">
       {lines.slice(0, revealed).map((l, i) => (
         <Text key={i}>{l}</Text>
       ))}
@@ -75,8 +75,9 @@ export function runSplash(lines: string[]): Promise<void> {
     const done = (): void => {
       if (settled) return;
       settled = true;
-      // defer the unmount out of React's render / input-handler cycle
+      // defer out of React's render / input-handler cycle, then erase the splash frame and unmount
       setImmediate(() => {
+        instance.clear(); // wipe the rendered logo so it doesn't linger in scrollback
         instance.unmount();
         resolve();
       });

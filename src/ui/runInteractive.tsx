@@ -210,36 +210,18 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
 
   await driver.init();
   await driver.hookRunner().fire("SessionStart", { mode: "interactive" });
-  // Alternate screen: take over the whole terminal while running, then restore the user's previous
-  // terminal contents on exit (like vim / codex).
-  const ESC = String.fromCharCode(27);
-  const useAlt = Boolean(process.stdout.isTTY);
-  let altActive = false;
-  const enterAlt = (): void => {
-    if (useAlt && !altActive) {
-      // alt screen + disable "alternate scroll" (1007) so the mouse wheel stops emitting ↑/↓
-      // (which were hijacking input history); + home cursor.
-      process.stdout.write(`${ESC}[?1049h${ESC}[?1007l${ESC}[H`);
-      altActive = true;
-    }
-  };
-  const leaveAlt = (): void => {
-    if (altActive) {
-      process.stdout.write(`${ESC}[?1007h${ESC}[?1049l`); // restore alt-scroll, leave alt screen
-      altActive = false;
-    }
-  };
-  process.once("exit", leaveAlt); // safety net for abnormal exits
 
-  enterAlt();
-  // Flashy startup splash: a larger, higher-detail logo revealed with a quick animation, then the
-  // app mounts. Only when we have a logo image, on a TTY, and not disabled via config/CODINGMALO_SPLASH.
-  if (logoPath && opts.config.splash && useAlt) {
+  // No alternate screen: render inline like Claude Code / Codex. The terminal keeps its native
+  // scrollback (the mouse wheel scrolls history instead of being mistaken for ↑/↓), the whole
+  // session stays visible after exit, and the IME tracks the real cursor in the normal buffer.
+  const isTty = Boolean(process.stdout.isTTY);
+  // Flashy startup splash: a larger, higher-detail logo revealed with a quick animation, which then
+  // erases itself (instance.clear()) before the app mounts. TTY + a logo image + config.splash only.
+  if (logoPath && opts.config.splash && isTty) {
     try {
       const cols = Math.max(20, Math.min((process.stdout.columns ?? 80) - 4, 60));
       const big = await renderImageHalfBlocks(logoPath, { maxCols: cols, bgThreshold });
       await runSplash(big);
-      process.stdout.write(`${ESC}[2J${ESC}[H`); // wipe the splash before the app mounts
     } catch {
       // ignore splash failures and fall through to the app
     }
@@ -256,6 +238,5 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
     instance.unmount();
     await driver.hookRunner().fire("SessionEnd", { mode: "interactive" });
     await driver.close();
-    leaveAlt();
   }
 }
