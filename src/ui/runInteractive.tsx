@@ -122,7 +122,7 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
           return;
         case "help": {
           const custom = [...commands.keys()].map((c) => `/${c}`).join(" ");
-          store.addNotice(`Commands: /help · /model [id] · /clear · /cost · /quit${custom ? `  ·  custom: ${custom}` : ""}`);
+          store.addNotice(`命令: /help · /model [名字] · /clear · /cost · /quit${custom ? `  ·  自定义: ${custom}` : ""}`);
           return;
         }
         case "clear":
@@ -130,19 +130,19 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
           return;
         case "cost": {
           const u = store.getSnapshot().usage;
-          store.addNotice(`Usage: ↑${u.input} ↓${u.output}${u.cacheRead ? ` · cache ${u.cacheRead}` : ""} · $${u.cost.toFixed(4)}`);
+          store.addNotice(`用量: ↑${u.input} ↓${u.output}${u.cacheRead ? ` · 缓存 ${u.cacheRead}` : ""} · $${u.cost.toFixed(4)}`);
           return;
         }
         case "model": {
           if (!args) {
             const avail = driver.availableModels();
             store.addNotice(
-              `Model: ${driver.getModel()}${avail.length ? `  ·  configured: ${avail.join(", ")}` : ""}. Switch with /model <id>.`,
+              `当前模型: ${driver.getModel()}${avail.length ? `  ·  可选档案: ${avail.join(", ")}` : ""}。用 /model <名字> 切换。`,
             );
           } else {
             driver.setModel(args);
-            store.setModel(args);
-            store.addNotice(`Model → ${args} (same provider/endpoint).`);
+            store.setModel(driver.getModel());
+            store.addNotice(`已切换 → ${driver.getModel()}`);
           }
           return;
         }
@@ -152,7 +152,7 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
         void runTurn(expandCommand(cmd, args));
         return;
       }
-      store.addNotice(`unknown command: /${name}`, true);
+      store.addNotice(`未知命令: /${name}`, true);
       return;
     }
     void runTurn(trimmed);

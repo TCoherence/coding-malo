@@ -52,4 +52,39 @@ describe("layered config", () => {
     fs.writeFileSync(path.join(home, "config.json"), JSON.stringify({ permissionMode: "nope" }));
     expect(() => loadFileConfig(ws)).toThrow(/invalid config/);
   });
+
+  it("resolves a named model profile (provider/model/baseUrl/apiKey via ${env:})", () => {
+    process.env.DS_KEY = "sk-ds";
+    fs.writeFileSync(
+      path.join(home, "config.json"),
+      JSON.stringify({
+        defaultModel: "ds",
+        models: {
+          ds: { provider: "openai-compat", model: "deepseek-chat", baseUrl: "https://api.deepseek.com", apiKey: "${env:DS_KEY}" },
+        },
+      }),
+    );
+    const cfg = resolveConfig({}, ws);
+    expect(cfg.providerKind).toBe("openai-compat");
+    expect(cfg.model).toBe("deepseek-chat");
+    expect(cfg.baseUrl).toBe("https://api.deepseek.com");
+    expect(cfg.apiKey).toBe("sk-ds");
+    expect(Object.keys(cfg.modelProfiles)).toContain("ds");
+    delete process.env.DS_KEY;
+  });
+
+  it("--model can select a profile and override the active provider", () => {
+    fs.writeFileSync(
+      path.join(home, "config.json"),
+      JSON.stringify({ models: { gpt: { provider: "openai-compat", model: "gpt-4o", baseUrl: "https://x/v1" } } }),
+    );
+    const cfg = resolveConfig({ model: "gpt" }, ws);
+    expect(cfg.providerKind).toBe("openai-compat");
+    expect(cfg.model).toBe("gpt-4o");
+  });
+
+  it("accepts a // comment key", () => {
+    fs.writeFileSync(path.join(home, "config.json"), JSON.stringify({ "//": "notes", defaultModel: "x" }));
+    expect(() => loadFileConfig(ws)).not.toThrow();
+  });
 });

@@ -8,6 +8,15 @@ import type { PermissionMode, SandboxTier } from "../permissions/types";
 import { OmcbConfigSchema } from "./schema";
 import type { HookDef, McpServerConfig, OmcbConfig } from "./schema";
 
+export interface ResolvedModelProfile {
+  name: string;
+  providerKind: "anthropic" | "openai-compat";
+  model: string;
+  baseUrl?: string;
+  apiKey?: string;
+  maxTokens?: number;
+}
+
 export interface ResolvedConfig {
   providerKind: "anthropic" | "openai-compat";
   model: string;
@@ -24,7 +33,8 @@ export interface ResolvedConfig {
   hooks: HookDef[];
   memoryFiles: string[];
   mcpServers: McpServerConfig[];
-  models: string[];
+  /** Named model profiles, keyed by name; switch the active one with /model or --model. */
+  modelProfiles: Record<string, ResolvedModelProfile>;
 }
 
 export interface ConfigOverrides {
@@ -128,25 +138,44 @@ export function loadFileConfig(workspace: string): OmcbConfig {
 export function resolveConfig(overrides: ConfigOverrides, workspace?: string): ResolvedConfig {
   const file: OmcbConfig = workspace ? loadFileConfig(workspace) : {};
 
-  const providerKind =
+  const topProvider: "anthropic" | "openai-compat" =
     overrides.provider ??
     (process.env.OMCB_PROVIDER as "anthropic" | "openai-compat" | undefined) ??
     file.provider ??
     "anthropic";
+  const topBaseUrl =
+    overrides.baseUrl ?? process.env.OMCB_BASE_URL ?? process.env.ANTHROPIC_BASE_URL ?? file.baseUrl;
+  const envApiKey = process.env.ANTHROPIC_API_KEY ?? process.env.OPENAI_API_KEY;
+
+  // Named model profiles (their ${env:} secrets were already interpolated by the loader).
+  const modelProfiles: Record<string, ResolvedModelProfile> = {};
+  for (const [name, p] of Object.entries(file.models ?? {})) {
+    modelProfiles[name] = {
+      name,
+      providerKind: p.provider ?? topProvider,
+      model: p.model,
+      baseUrl: p.baseUrl ?? topBaseUrl,
+      apiKey: p.apiKey ?? envApiKey,
+      maxTokens: p.maxTokens,
+    };
+  }
+
+  // The active model: a profile name (→ use its provider/key/baseUrl) or a raw wire id on top-level.
+  const requested = overrides.model ?? process.env.OMCB_MODEL ?? file.defaultModel ?? DEFAULT_MODEL;
+  const active = modelProfiles[requested];
 
   const permissionMode: PermissionMode = overrides.dangerouslySkipPermissions
     ? "bypass"
     : (overrides.permissionMode ?? file.permissionMode ?? "bypass");
-
   const promptCaching = overrides.promptCaching ?? envBool("OMCB_PROMPT_CACHING") ?? file.promptCaching;
 
   return {
-    providerKind,
-    model: overrides.model ?? process.env.OMCB_MODEL ?? file.defaultModel ?? DEFAULT_MODEL,
-    apiKey: process.env.ANTHROPIC_API_KEY ?? process.env.OPENAI_API_KEY,
-    baseUrl: overrides.baseUrl ?? process.env.OMCB_BASE_URL ?? process.env.ANTHROPIC_BASE_URL ?? file.baseUrl,
+    providerKind: active ? active.providerKind : topProvider,
+    model: active ? active.model : requested,
+    apiKey: active ? active.apiKey : envApiKey,
+    baseUrl: active ? active.baseUrl : topBaseUrl,
     maxTurns: overrides.maxTurns ?? Number(process.env.OMCB_MAX_TURNS ?? file.maxTurns ?? 25),
-    maxTokens: overrides.maxTokens ?? Number(process.env.OMCB_MAX_TOKENS ?? file.maxTokens ?? 8192),
+    maxTokens: overrides.maxTokens ?? active?.maxTokens ?? Number(process.env.OMCB_MAX_TOKENS ?? file.maxTokens ?? 8192),
     permissionMode,
     sandbox: overrides.sandbox ?? file.sandbox ?? "workspace-write",
     allowedTools: overrides.allowedTools ?? file.allowedTools,
@@ -161,6 +190,6 @@ export function resolveConfig(overrides: ConfigOverrides, workspace?: string): R
     hooks: file.hooks ?? [],
     memoryFiles: file.memory?.files ?? ["AGENTS.md", "CLAUDE.md"],
     mcpServers: file.mcpServers ?? [],
-    models: file.models ?? [],
+    modelProfiles,
   };
 }

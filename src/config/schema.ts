@@ -30,12 +30,29 @@ export const McpServerSchema = z.object({
 });
 export type McpServerConfig = z.infer<typeof McpServerSchema>;
 
+/**
+ * A named model profile. Lets the user keep several models (each with its own provider, endpoint,
+ * key, and wire model id) and switch between them with `/model <name>` or `--model <name>`.
+ * Put secrets in .env and reference them here via `${env:VAR}` so config.json stays commitable.
+ */
+export const ModelProfileSchema = z.object({
+  provider: z.enum(["anthropic", "openai-compat"]).optional(),
+  model: z.string(),
+  baseUrl: z.string().optional(),
+  apiKey: z.string().optional(),
+  maxTokens: z.number().int().positive().optional(),
+});
+export type ModelProfile = z.infer<typeof ModelProfileSchema>;
+
 /** The on-disk config (global ~/.omcb/config.json + project .omcb/config.json). All fields optional. */
 export const OmcbConfigSchema = z
   .object({
+    /** Free-form comment key (JSON has no comments); ignored. */
+    "//": z.string().optional(),
+    /** Active model: a profile name from `models`, or a raw wire model id. */
     defaultModel: z.string().optional(),
-    /** Models offered by the `/model` picker (free-form `/model <id>` always works too). */
-    models: z.array(z.string()).optional(),
+    /** Named model profiles, switchable with /model. e.g. { "deepseek": { provider, model, … } }. */
+    models: z.record(z.string(), ModelProfileSchema).optional(),
     provider: z.enum(["anthropic", "openai-compat"]).optional(),
     baseUrl: z.string().optional(),
     maxTurns: z.number().int().positive().optional(),

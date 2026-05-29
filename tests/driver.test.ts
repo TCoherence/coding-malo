@@ -38,8 +38,16 @@ describe("AgentDriver model switching", () => {
     expect(driver.availableModels()).toEqual([]);
   });
 
-  it("exposes configured models for the /model picker", () => {
-    fs.writeFileSync(path.join(home, "config.json"), JSON.stringify({ models: ["deepseek-chat", "deepseek-reasoner"] }));
+  it("exposes configured model profiles for /model", () => {
+    fs.writeFileSync(
+      path.join(home, "config.json"),
+      JSON.stringify({
+        models: {
+          ds: { provider: "anthropic", model: "deepseek-chat" },
+          dsr: { provider: "anthropic", model: "deepseek-reasoner" },
+        },
+      }),
+    );
     const config = resolveConfig({}, ws);
     const driver = new AgentDriver({
       config,
@@ -48,6 +56,32 @@ describe("AgentDriver model switching", () => {
       prompter: new HeadlessPrompter("bypass"),
       provider: new MockProvider([]),
     });
-    expect(driver.availableModels()).toEqual(["deepseek-chat", "deepseek-reasoner"]);
+    expect(driver.availableModels().sort()).toEqual(["ds", "dsr"]);
+  });
+
+  it("switches the whole provider when /model selects a profile", () => {
+    fs.writeFileSync(
+      path.join(home, "config.json"),
+      JSON.stringify({
+        defaultModel: "a",
+        models: {
+          a: { provider: "anthropic", model: "model-a" },
+          b: { provider: "openai-compat", model: "model-b", baseUrl: "https://x/v1", apiKey: "k" },
+        },
+      }),
+    );
+    const config = resolveConfig({}, ws);
+    expect(config.providerKind).toBe("anthropic");
+    expect(config.model).toBe("model-a");
+    const driver = new AgentDriver({
+      config,
+      sessionId: "s",
+      workspace: ws,
+      prompter: new HeadlessPrompter("bypass"),
+      provider: new MockProvider([]), // avoid building a real provider at construction
+    });
+    expect(driver.getModel()).toBe("model-a");
+    driver.setModel("b"); // rebuilds to the openai-compat profile
+    expect(driver.getModel()).toBe("model-b");
   });
 });

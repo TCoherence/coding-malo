@@ -1,0 +1,40 @@
+{
+  "//": "复制到 ~/.omcb/config.json（全局）或 <项目>/.omcb/config.json（项目级）。密钥用 ${env:XXX} 引用 .env，不要直接写明文。运行时用 /model <名字> 或 --model <名字> 切换。",
+
+  "defaultModel": "deepseek",
+
+  "models": {
+    "deepseek": {
+      "provider": "anthropic",
+      "model": "deepseek-chat",
+      "baseUrl": "https://api.deepseek.com/anthropic",
+      "apiKey": "${env:DEEPSEEK_API_KEY}"
+    },
+    "deepseek-r": {
+      "provider": "anthropic",
+      "model": "deepseek-reasoner",
+      "baseUrl": "https://api.deepseek.com/anthropic",
+      "apiKey": "${env:DEEPSEEK_API_KEY}"
+    },
+    "deepseek-oai": {
+      "provider": "openai-compat",
+      "model": "deepseek-chat",
+      "baseUrl": "https://api.deepseek.com",
+      "apiKey": "${env:DEEPSEEK_API_KEY}"
+    },
+    "gpt-4o": {
+      "provider": "openai-compat",
+      "model": "gpt-4o",
+      "baseUrl": "https://api.openai.com/v1",
+      "apiKey": "${env:OPENAI_API_KEY}"
+    },
+    "opus": {
+      "provider": "anthropic",
+      "model": "claude-opus-4-8",
+      "apiKey": "${env:ANTHROPIC_API_KEY}"
+    }
+  },
+
+  "permissionMode": "acceptEdits",
+  "sandbox": "workspace-write"
+}

@@ -35,12 +35,14 @@ node dist/cli.js -p "list files"       # headless NDJSON
 echo "summarize README" | node dist/cli.js
 ```
 
-Set `ANTHROPIC_API_KEY` (and optionally `ANTHROPIC_BASE_URL` / `OMCB_BASE_URL` for a gateway), or
-copy `.env.example` → `.env` (auto-loaded, gitignored).
+**Models & secrets.** Put API keys in `.env` (gitignored, auto-loaded — copy `.env.example`). Define
+named **model profiles** in `config.json` (global `~/.omcb/config.json` or project `.omcb/config.json`),
+each with its own `provider` / `model` / `baseUrl` / `apiKey` — reference keys via `${env:VAR}` so the
+file stays commitable (no secrets). See `config.example.json`. Switch with `/model <name>` (interactive)
+or `--model <name>` (headless): this swaps the whole provider + endpoint + key + model in one step.
 
-**Interactive commands:** `/model [id]` (switch model live; configure a picker list via `models: [...]`
-in `.omcb/config.json`), `/help`, `/clear`, `/cost`, `/quit`, plus markdown commands in `.omcb/commands/`.
-`↑/↓` recall history. Tool calls render as live cards; the header shows the active model.
+**Interactive commands:** `/model [name]`, `/help`, `/clear`, `/cost`, `/quit`, plus markdown commands in
+`.omcb/commands/`. `↑/↓` recall history. Tool calls render as live cards; the header shows the model.
 
 ## Headless protocol (NDJSON)
 

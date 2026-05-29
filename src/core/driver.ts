@@ -38,7 +38,7 @@ export class AgentDriver {
   readonly conversation: NormalizedMessage[];
   private readonly registry: ToolRegistry;
   private readonly permissions: PermissionEngine;
-  private readonly provider: Provider;
+  private provider: Provider;
   private readonly env: Record<string, string>;
   private readonly hooks: HookRunner;
   private readonly memory: string;
@@ -85,11 +85,30 @@ export class AgentDriver {
   getModel(): string {
     return this.currentModel;
   }
-  setModel(model: string): void {
-    this.currentModel = model;
+
+  /**
+   * Switch the active model. If `idOrName` matches a configured profile, the whole provider is
+   * rebuilt (provider kind + endpoint + key + model). Otherwise it's treated as a raw wire model id
+   * on the current provider.
+   */
+  setModel(idOrName: string): void {
+    const p = this.opts.config.modelProfiles[idOrName];
+    if (p) {
+      this.provider = buildProvider({
+        kind: p.providerKind,
+        ...(p.apiKey ? { apiKey: p.apiKey } : {}),
+        ...(p.baseUrl ? { baseUrl: p.baseUrl } : {}),
+        ...(this.opts.config.promptCaching !== undefined ? { promptCaching: this.opts.config.promptCaching } : {}),
+      });
+      this.currentModel = p.model;
+    } else {
+      this.currentModel = idOrName;
+    }
   }
+
+  /** Configured profile names available to /model. */
   availableModels(): string[] {
-    return this.opts.config.models;
+    return Object.keys(this.opts.config.modelProfiles);
   }
 
   /** Connect MCP servers and register their tools. Call once before the first turn. */
