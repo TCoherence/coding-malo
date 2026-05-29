@@ -41,6 +41,7 @@
     "ink": "^7.0.4",
     "jimp": "^1.6.1",
     "react": "^19.2.6",
+    "string-width": "^8.2.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {

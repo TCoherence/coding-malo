@@ -1,5 +1,7 @@
-import { Box, Static, Text, useInput } from "ink";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { Box, Static, Text, useCursor, useInput } from "ink";
+import type { DOMElement } from "ink";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import stringWidth from "string-width";
 import type { ReactElement } from "react";
 
 import type { Store, StoreState, ToolCard, TranscriptItem } from "../core/store";
@@ -247,10 +249,29 @@ function ApprovalModal({ req }: { req: ApprovalRequest }): ReactElement {
   );
 }
 
+/** Absolute (x,y) of a box within the Ink dynamic frame: sum computed offsets up to <ink-root>. */
+function frameAbsPos(node: DOMElement | null): { x: number; y: number } {
+  let x = 0;
+  let y = 0;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let n: any = node;
+  while (n?.yogaNode) {
+    const l = n.yogaNode.getComputedLayout();
+    x += l.left ?? 0;
+    y += l.top ?? 0;
+    if (n.nodeName === "ink-root") break;
+    n = n.parentNode;
+  }
+  return { x, y };
+}
+
 function Prompt({ onSubmit, history }: { onSubmit: (text: string) => void; history: string[] }): ReactElement {
   const [value, setValue] = useState("");
   const [cursor, setCursor] = useState(0); // caret index into value (0..value.length)
   const [histCursor, setHistCursor] = useState<number | null>(null); // null = editing a fresh line
+  const boxRef = useRef<DOMElement | null>(null);
+  const [boxPos, setBoxPos] = useState<{ x: number; y: number } | null>(null);
+  const { setCursorPosition } = useCursor(); // Ink 7 places the REAL terminal cursor → IME anchors at the caret
 
   const load = (text: string): void => {
     setValue(text);
@@ -317,15 +338,27 @@ function Prompt({ onSubmit, history }: { onSubmit: (text: string) => void; histo
     }
   });
 
+  // Re-measure the input box's frame position after every render (cheap; bails out when unchanged).
+  useEffect(() => {
+    if (!boxRef.current) return;
+    const p = frameAbsPos(boxRef.current);
+    setBoxPos((prev) => (prev && prev.x === p.x && prev.y === p.y ? prev : p));
+  });
+
+  // Drive the real terminal cursor to the caret cell. Inside the box: border(1) + paddingX(1) +
+  // "› " prefix(2) = 4 cols before the text; the caret row is the box's top border + 1. Width of the
+  // text before the caret is measured CJK-aware via string-width. (Ink hides the cursor when unset.)
   const before = value.slice(0, cursor);
-  const atChar = value.slice(cursor, cursor + 1) || " ";
-  const after = value.slice(cursor + 1);
+  if (boxPos) {
+    setCursorPosition({ x: boxPos.x + 4 + stringWidth(before), y: boxPos.y + 1 });
+  } else {
+    setCursorPosition(undefined);
+  }
+
   return (
-    <Box borderStyle="round" borderColor="cyan" paddingX={1}>
+    <Box ref={boxRef} borderStyle="round" borderColor="cyan" paddingX={1}>
       <Text color="cyan">› </Text>
-      <Text>{before}</Text>
-      <Text inverse>{atChar}</Text>
-      <Text>{after}</Text>
+      <Text>{value}</Text>
     </Box>
   );
 }

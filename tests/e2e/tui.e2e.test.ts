@@ -71,17 +71,29 @@ describe("TUI e2e (real PTY + headless xterm)", () => {
     expect(session.screen()).toContain("/help");
   });
 
-  it("keeps the input cursor down at the prompt (IME anchor), not parked at the top", async () => {
+  it("places the real cursor exactly on the caret — English, mid-string, and CJK (IME anchor, #4)", async () => {
     session = new TuiSession({ env: env({ CODINGMALO_SPLASH: "0" }), rows: 40 });
     await session.waitFor((s) => s.includes("›"));
-    session.type("hi");
-    await session.waitFor((s) => s.includes("hi"));
-    await session.settle(150);
-    const rows = session.screen().split("\n");
-    const promptRow = rows.findIndex((l) => l.includes("›"));
-    const { y } = session.cursor();
-    expect(promptRow).toBeGreaterThan(5); // prompt is in the lower region, not the top
-    expect(y).toBeGreaterThanOrEqual(promptRow); // cursor is at / just below the prompt line
-    expect(y - promptRow).toBeLessThanOrEqual(2); // …and right next to it (IME lands here)
+    const promptRow = () => session.screen().split("\n").findIndex((l) => l.includes("›"));
+    const PREFIX = 4; // box border(1) + paddingX(1) + "› "(2) before the text
+
+    session.type("hello");
+    await session.waitFor((s) => s.includes("hello"));
+    await session.settle(120);
+    let cur = session.cursor();
+    expect(cur.y).toBe(promptRow()); // cursor sits on the prompt line itself
+    expect(cur.x).toBe(PREFIX + 5); // caret after "hello"
+
+    session.left(2); // caret to "hel|lo"
+    await session.settle(120);
+    expect(session.cursor().x).toBe(PREFIX + 3); // 3 columns of text before the caret
+
+    session.right(2);
+    session.type("中文"); // two double-width chars
+    await session.waitFor((s) => s.includes("中文"));
+    await session.settle(120);
+    cur = session.cursor();
+    expect(cur.y).toBe(promptRow());
+    expect(cur.x).toBe(PREFIX + 5 + 4); // "hello"(5) + "中文"(2×width-2 = 4)
   });
 });
