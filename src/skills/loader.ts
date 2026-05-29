@@ -94,7 +94,9 @@ export function makeSkillTool(skills: LoadedSkill[]): Tool {
   const byName = new Map(skills.map((s) => [s.name, s]));
   return {
     name: "Skill",
-    description: `Load the full instructions for an available skill. Skills: ${skills.map((s) => s.name).join(", ") || "(none)"}.`,
+    // Names live in the system prompt's "## Available Skills" block — keep this static so the tool
+    // schema stays stable (better prompt caching) and isn't duplicated every turn.
+    description: "Load the full instructions for an available skill by name before using it.",
     schema: skillSchema,
     source: "skill",
     permission: { effects: ["read"], resource: (i: { name: string }) => `skill:${i.name}` },

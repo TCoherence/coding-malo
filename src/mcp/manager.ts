@@ -4,7 +4,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 
 import type { McpServerConfig } from "../config/schema";
 import type { McpServerStatus } from "../core/events";
-import type { Tool, ToolResult } from "../tools/types";
+import type { Tool, ToolResult, ToolResultBlock } from "../tools/types";
 
 interface McpToolSpec {
   name: string;
@@ -27,12 +27,23 @@ export function wrapMcpTool(server: string, client: Client, spec: McpToolSpec): 
         name: spec.name,
         arguments: (input ?? {}) as Record<string, unknown>,
       })) as { content?: unknown; isError?: boolean };
-      const content = Array.isArray(res.content) ? res.content : [];
-      const text = content
-        .filter((c): c is { type: "text"; text: string } => !!c && (c as { type?: string }).type === "text")
-        .map((c) => c.text)
-        .join("\n");
-      return { content: text || "(no output)", isError: Boolean(res.isError) };
+      const isError = Boolean(res.isError);
+      const raw = Array.isArray(res.content) ? res.content : [];
+      const blocks: ToolResultBlock[] = [];
+      for (const c of raw) {
+        if (!c || typeof c !== "object") continue;
+        const b = c as { type?: string; text?: string; data?: string; mimeType?: string };
+        if (b.type === "text" && typeof b.text === "string") blocks.push({ type: "text", text: b.text });
+        else if (b.type === "image" && typeof b.data === "string") {
+          blocks.push({ type: "image", mimeType: b.mimeType ?? "image/png", data: b.data });
+        } else if (b.type) {
+          blocks.push({ type: "text", text: `[${b.type} content]` }); // don't silently drop non-text
+        }
+      }
+      if (blocks.length === 0) return { content: "(no output)", isError };
+      // Preserve structured (image/…) content as blocks; collapse pure-text to a string.
+      if (blocks.some((b) => b.type !== "text")) return { content: blocks, isError };
+      return { content: blocks.map((b) => (b.type === "text" ? b.text : "")).join("\n"), isError };
     },
   };
 }

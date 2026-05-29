@@ -45,13 +45,16 @@ optional `error` + `error_kind`). `usage`/`error_kind`/`session_id` field names 
 oh-my-agent's `AgentResponse`. Exit code is non-zero when `error_kind` is set.
 `--output-format`: `stream-json` (default), `json` (init+result only), `text` (final text only).
 
-## Status
+## Status — all milestones shipped (M0–M7)
 
-**M0 shipped** (thin end-to-end vertical slice): Anthropic streaming provider, agent loop, builtin
-tools (Bash/Read/Write/Edit), minimal permission engine + env sandbox, session store + `--resume`,
-headless print mode, and a minimal Ink TUI. 22 tests pass; typecheck + build clean.
+- **M0** — engine spine: Anthropic streaming, agent loop, builtin tools (Bash/Read/Write/Edit), session store + `--resume`, headless print mode, Ink TUI.
+- **M1** — providers: Anthropic prompt-caching + extended thinking, OpenAI-compatible adapter, cost accounting, status-first error classification.
+- **M2** — permissions + sandbox: modes (plan/default/acceptEdits/bypass), interactive approval modal + remembered decisions, env sanitization, opt-in macOS `sandbox-exec`.
+- **M3** — oh-my-agent integration: a Python `OmcbCLIAgent` adapter (`/Users/yanghanzhi/repos/oh-my-agent`) that drives omcb as a drop-in for claude/codex/gemini.
+- **M4** — layered config (`${env:}`, zod), project memory (AGENTS.md/CLAUDE.md), markdown slash commands, lifecycle hooks (Pre/PostToolUse, UserPromptSubmit, Session*, Stop).
+- **M5** — MCP client (stdio + http) + Skills (SKILL.md progressive disclosure).
+- **M6** — sub-agents (`Task`, fg/bg via `TaskManager`) + planning (`update_plan` + live plan panel).
+- **M7** — TUI polish (delta coalescing, input history, double-Ctrl-C) + npm packaging.
 
-Roadmap: **M1** providers hardening (prompt caching, thinking, OpenAI-compat, cost) · **M2**
-permissions + sandbox · **M3** oh-my-agent `OmcbCLIAgent` adapter · **M4** config/memory/slash/hooks
-· **M5** MCP + Skills · **M6** sub-agents + planning · **M7** TUI polish + packaging. See the plan at
-`~/.claude/plans/mighty-whistling-nest.md`.
+65 tests pass; typecheck + build clean; both provider paths and the oh-my-agent integration verified
+live against DeepSeek. Full plan: `~/.claude/plans/mighty-whistling-nest.md`.

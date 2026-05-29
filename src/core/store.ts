@@ -58,6 +58,7 @@ export class Store {
   private readonly listeners = new Set<() => void>();
   private readonly approvals: PendingApproval[] = [];
   private notifyScheduled = false;
+  private notifyHandle: NodeJS.Immediate | null = null;
 
   getSnapshot = (): StoreState => this.state;
 
@@ -73,10 +74,28 @@ export class Store {
   private notify(): void {
     if (this.notifyScheduled) return;
     this.notifyScheduled = true;
-    setImmediate(() => {
+    this.notifyHandle = setImmediate(() => {
       this.notifyScheduled = false;
+      this.notifyHandle = null;
       for (const l of this.listeners) l();
     });
+  }
+
+  /** Fire any pending coalesced notification immediately (e.g. before unmounting on exit). */
+  flush(): void {
+    if (!this.notifyScheduled) return;
+    if (this.notifyHandle) clearImmediate(this.notifyHandle);
+    this.notifyHandle = null;
+    this.notifyScheduled = false;
+    for (const l of this.listeners) l();
+  }
+
+  /** Resolve any queued approval prompts as denied (e.g. when the session is exiting). */
+  cancelPendingApprovals(reason = "session ended"): void {
+    while (this.approvals.length > 0) {
+      this.approvals.shift()!.resolve({ allow: false, reason });
+    }
+    this.set((s) => ({ ...s, approvalQueue: [] }));
   }
 
   private set(next: (s: StoreState) => StoreState): void {

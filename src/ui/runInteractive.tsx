@@ -130,19 +130,24 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
     void runTurn(trimmed);
   };
 
-  let lastExitPress = 0;
+  let exitArmed = false;
+  let exitTimer: NodeJS.Timeout | null = null;
   const onInterrupt = (): void => {
     if (busy && currentAbort) {
       currentAbort.abort(new OmcbError("timeout", "interrupted by user"));
       return;
     }
-    const now = Date.now();
-    if (now - lastExitPress < 1500) {
+    if (exitArmed) {
+      if (exitTimer) clearTimeout(exitTimer);
       exit();
       return;
     }
-    lastExitPress = now;
+    exitArmed = true;
     store.addNotice("Press Ctrl+C again to exit.");
+    exitTimer = setTimeout(() => {
+      exitArmed = false;
+    }, 1500);
+    if (typeof exitTimer.unref === "function") exitTimer.unref();
   };
 
   await driver.init();
@@ -151,6 +156,8 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
     exitOnCtrlC: false,
   });
   await finished;
+  store.cancelPendingApprovals(); // unblock any awaited approval before tearing down
+  store.flush();
   await driver.hookRunner().fire("SessionEnd", { mode: "interactive" });
   await driver.close();
   instance.unmount();

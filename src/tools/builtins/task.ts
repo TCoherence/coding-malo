@@ -31,7 +31,8 @@ export const taskTool: Tool<TaskInput> = {
       return { content: `Started background task ${id}. Poll it with task_status.` };
     }
     const r = await ctx.spawnSubagent({ prompt: input.prompt });
-    return { content: r.text, isError: r.isError };
+    // Surface the sub-agent's token usage so the engine folds it into this turn's total.
+    return { content: r.text, isError: r.isError, details: { usage: r.usage } };
   },
 };
 

@@ -57,6 +57,8 @@ export interface AgentLoopConfig {
   hooks?: HookRunner;
   mcpServers?: McpServerStatus[];
   taskManager?: TaskManager;
+  /** Identifies the agent for tool context (sub-agents get a distinct id). Defaults to "root". */
+  agentId?: string;
   logger?: Logger;
 }
 
@@ -117,7 +119,7 @@ async function runSubagent(
   cfg: AgentLoopConfig,
   opts: { prompt: string; allowedTools?: string[]; systemPrompt?: string },
   logger: Logger,
-): Promise<{ text: string; isError: boolean }> {
+): Promise<{ text: string; isError: boolean; usage: NormalizedUsage }> {
   const base = opts.allowedTools ?? cfg.allowedTools ?? cfg.registry.names();
   const allowed = base.filter((n) => n !== "Task" && n !== "task_status");
   const childCfg: AgentLoopConfig = {
@@ -134,6 +136,7 @@ async function runSubagent(
     env: cfg.env,
     sandbox: cfg.sandbox,
     allowedTools: allowed,
+    agentId: "sub",
     logger,
   };
   const conversation: NormalizedMessage[] = [];
@@ -141,14 +144,14 @@ async function runSubagent(
   let step = await gen.next();
   while (!step.done) step = await gen.next();
   const result = step.value;
-  return { text: result.text || "(no output)", isError: Boolean(result.errorKind) };
+  return { text: result.text || "(no output)", isError: Boolean(result.errorKind), usage: result.usage };
 }
 
 async function executeTool(
   cfg: AgentLoopConfig,
   call: ToolUseBlock,
   logger: Logger,
-): Promise<{ output: string; isError: boolean; plan?: PlanState }> {
+): Promise<{ output: string; isError: boolean; plan?: PlanState; usage?: NormalizedUsage }> {
   const tool = cfg.registry.get(call.name);
   if (!tool) return { output: `unknown tool: ${call.name}`, isError: true };
 
@@ -159,7 +162,7 @@ async function executeTool(
     sandbox: cfg.sandbox,
     emitChunk: () => {}, // M0: live tool output is not yet forwarded to the protocol
     requestApproval: (req) => cfg.permissions.prompter.prompt(req),
-    agentId: ROOT_AGENT,
+    agentId: cfg.agentId ?? ROOT_AGENT,
     logger,
     spawnSubagent: (opts) => runSubagent(cfg, opts, logger),
     ...(cfg.taskManager ? { taskManager: cfg.taskManager } : {}),
@@ -190,7 +193,8 @@ async function executeTool(
     if (cfg.hooks) await cfg.hooks.postToolUse(call.name, data, output);
     const details = result.details as Record<string, unknown> | undefined;
     const plan = details && "plan" in details ? (details.plan as PlanState) : undefined;
-    return { output, isError: result.isError ?? false, ...(plan ? { plan } : {}) };
+    const usage = details && "usage" in details ? (details.usage as NormalizedUsage) : undefined;
+    return { output, isError: result.isError ?? false, ...(plan ? { plan } : {}), ...(usage ? { usage } : {}) };
   } catch (err) {
     logger.error("tool execution failed", call.name, err);
     return { output: `tool error: ${err instanceof Error ? err.message : String(err)}`, isError: true };
@@ -417,6 +421,11 @@ export async function* run(
       const r = results[i]!;
       yield { type: "tool_result", tool_id: tu.id, name: tu.name, output: r.output, is_error: r.isError };
       if (r.plan) yield { type: "plan", plan: r.plan };
+      if (r.usage) {
+        // Sub-agent tokens count toward this turn's total (tokens aggregate; cost is recomputed in buildResult).
+        addUsage(cumulative, r.usage);
+        yield { type: "usage", ...usageToWire(r.usage) };
+      }
       toolResultBlocks.push({ type: "tool_result", toolUseId: tu.id, output: r.output, isError: r.isError });
     }
     const toolResultMessage: NormalizedMessage = {

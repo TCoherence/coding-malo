@@ -68,8 +68,15 @@ export class HookRunner {
         clearTimeout(timer);
         resolve({ code: code ?? 1, stdout });
       });
-      child.stdin.write(JSON.stringify(payload));
-      child.stdin.end();
+      // A hook that exits before reading stdin makes the write emit EPIPE; swallow it so an
+      // unhandled stream 'error' can't crash the whole agent.
+      child.stdin.on("error", () => {});
+      try {
+        child.stdin.write(JSON.stringify(payload));
+        child.stdin.end();
+      } catch {
+        /* stdin already closed */
+      }
     });
   }
 

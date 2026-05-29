@@ -101,8 +101,9 @@ function configFilePaths(workspace: string): string[] {
   let dir = path.resolve(workspace);
   const stop = os.homedir();
   for (;;) {
+    if (dir === stop) break; // home's .omcb/config.json is the global config, already added above
     projectDirs.push(dir);
-    if (dir === stop || fs.existsSync(path.join(dir, ".git"))) break;
+    if (fs.existsSync(path.join(dir, ".git"))) break;
     const parent = path.dirname(dir);
     if (parent === dir) break;
     dir = parent;

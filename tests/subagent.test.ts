@@ -66,6 +66,9 @@ describe("sub-agents", () => {
     expect(toolResult.name).toBe("Task");
     expect(toolResult.output).toContain("sub did it");
     expect(result.text).toBe("parent done");
+    // 3 provider calls (parent turn0 + child + parent turn2) @ 10 input each → child usage aggregated.
+    expect(result.usage.inputTokens).toBe(30);
+    expect(result.usage.outputTokens).toBe(15);
   });
 });
 

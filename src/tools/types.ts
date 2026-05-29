@@ -1,12 +1,13 @@
 import type { ZodType } from "zod";
 
 import type { TaskManager } from "../agent/task-manager";
-import type { ToolSource } from "../core/types";
+import type { NormalizedUsage, ToolSource } from "../core/types";
 import type { ApprovalRequest, Decision, PermissionEffect, SandboxTier } from "../permissions/types";
 
 export interface SubagentResult {
   text: string;
   isError: boolean;
+  usage: NormalizedUsage;
 }
 
 export interface Logger {

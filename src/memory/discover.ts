@@ -28,8 +28,9 @@ export function discoverMemory(workspace: string, files: string[] = ["AGENTS.md"
   let dir = path.resolve(workspace);
   const stop = os.homedir();
   for (;;) {
+    if (dir === stop) break; // never pull memory from the home directory itself (use ~/.omcb/AGENTS.md)
     dirs.push(dir);
-    if (dir === stop || fs.existsSync(path.join(dir, ".git"))) break;
+    if (fs.existsSync(path.join(dir, ".git"))) break; // repo root is the natural boundary
     const parent = path.dirname(dir);
     if (parent === dir) break;
     dir = parent;
