@@ -4,6 +4,8 @@
   "private": true,
   "description": "OMCB — a terminal coding agent that talks directly to model APIs (Anthropic + OpenAI-compatible), with an interactive Ink TUI and a headless NDJSON print mode.",
   "type": "module",
+  "license": "MIT",
+  "keywords": ["cli", "coding-agent", "ai", "anthropic", "openai", "ink", "tui", "mcp"],
   "bin": {
     "omcb": "./dist/cli.js"
   },
@@ -19,15 +21,15 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "start": "node dist/cli.js"
+    "start": "node dist/cli.js",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "ink": "^7.0.4",
     "react": "^19.2.6",
-    "zod": "^4.4.3",
-    "zod-to-json-schema": "^3.25.2"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",

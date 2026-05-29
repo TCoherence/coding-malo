@@ -111,13 +111,15 @@ function ApprovalModal({ req }: { req: ApprovalRequest }): ReactElement {
   );
 }
 
-function Prompt({ onSubmit }: { onSubmit: (text: string) => void }): ReactElement {
+function Prompt({ onSubmit, history }: { onSubmit: (text: string) => void; history: string[] }): ReactElement {
   const [value, setValue] = useState("");
+  const [histCursor, setHistCursor] = useState<number | null>(null); // null = editing a fresh line
   useInput((input, key) => {
     if (key.ctrl && (input === "c" || input === "d")) return; // handled at App level
     if (key.return) {
       const v = value;
       setValue("");
+      setHistCursor(null);
       onSubmit(v);
       return;
     }
@@ -125,10 +127,30 @@ function Prompt({ onSubmit }: { onSubmit: (text: string) => void }): ReactElemen
       setValue((v) => v.slice(0, -1));
       return;
     }
-    if (key.tab || key.upArrow || key.downArrow || key.leftArrow || key.rightArrow || key.escape) {
+    if (key.upArrow) {
+      if (history.length === 0) return;
+      const next = histCursor === null ? history.length - 1 : Math.max(0, histCursor - 1);
+      setHistCursor(next);
+      setValue(history[next] ?? "");
       return;
     }
-    if (input && !key.ctrl && !key.meta) setValue((v) => v + input);
+    if (key.downArrow) {
+      if (histCursor === null) return;
+      const next = histCursor + 1;
+      if (next >= history.length) {
+        setHistCursor(null);
+        setValue("");
+      } else {
+        setHistCursor(next);
+        setValue(history[next] ?? "");
+      }
+      return;
+    }
+    if (key.tab || key.leftArrow || key.rightArrow || key.escape) return;
+    if (input && !key.ctrl && !key.meta) {
+      setValue((v) => v + input);
+      setHistCursor(null);
+    }
   });
   return (
     <Box>
@@ -149,6 +171,11 @@ export function App({
   onInterrupt: () => void;
 }): ReactElement {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const [history, setHistory] = useState<string[]>([]);
+  const submit = (text: string): void => {
+    if (text.trim().length > 0) setHistory((h) => [...h, text]);
+    onSubmit(text);
+  };
 
   const pendingApproval = state.approvalQueue[0];
 
@@ -181,7 +208,7 @@ export function App({
       ) : state.busy ? (
         <Text dimColor>… working (Ctrl+C to interrupt)</Text>
       ) : (
-        <Prompt onSubmit={onSubmit} />
+        <Prompt onSubmit={submit} history={history} />
       )}
     </Box>
   );

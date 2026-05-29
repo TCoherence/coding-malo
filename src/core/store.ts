@@ -57,6 +57,7 @@ export class Store {
   private state: StoreState = initialState();
   private readonly listeners = new Set<() => void>();
   private readonly approvals: PendingApproval[] = [];
+  private notifyScheduled = false;
 
   getSnapshot = (): StoreState => this.state;
 
@@ -65,9 +66,22 @@ export class Store {
     return () => this.listeners.delete(cb);
   };
 
+  /**
+   * Coalesce notifications: many streamed deltas in one tick collapse to a single re-render.
+   * State itself updates synchronously (getSnapshot is always current); only the notify is batched.
+   */
+  private notify(): void {
+    if (this.notifyScheduled) return;
+    this.notifyScheduled = true;
+    setImmediate(() => {
+      this.notifyScheduled = false;
+      for (const l of this.listeners) l();
+    });
+  }
+
   private set(next: (s: StoreState) => StoreState): void {
     this.state = next(this.state);
-    for (const l of this.listeners) l();
+    this.notify();
   }
 
   addUser(text: string): void {

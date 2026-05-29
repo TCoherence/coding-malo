@@ -62,4 +62,32 @@ describe("TUI App", () => {
     await tick();
     expect(lastFrame() ?? "").not.toContain("Approval required");
   });
+
+  it("coalesces many streamed deltas into a single notification", async () => {
+    const store = new Store();
+    let calls = 0;
+    store.subscribe(() => {
+      calls += 1;
+    });
+    store.apply({ type: "message_start", role: "assistant", agent_id: "root" });
+    store.apply({ type: "text_delta", text: "a", agent_id: "root" });
+    store.apply({ type: "text_delta", text: "b", agent_id: "root" });
+    expect(calls).toBe(0); // notifications are deferred/coalesced
+    await new Promise((r) => setImmediate(r));
+    expect(calls).toBe(1);
+    expect(store.getSnapshot().live?.assistantText).toBe("ab");
+  });
+
+  it("recalls the previous input with the up arrow", async () => {
+    const store = new Store();
+    const { lastFrame, stdin } = render(<App store={store} onSubmit={() => {}} onInterrupt={() => {}} />);
+    await tick();
+    stdin.write("hello world");
+    await tick();
+    stdin.write("\r"); // submit → pushed to history, input cleared
+    await tick();
+    stdin.write("[A"); // up arrow → recall
+    await tick();
+    expect(lastFrame() ?? "").toContain("hello world");
+  });
 });

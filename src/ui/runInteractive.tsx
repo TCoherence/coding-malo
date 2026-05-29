@@ -130,9 +130,19 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
     void runTurn(trimmed);
   };
 
+  let lastExitPress = 0;
   const onInterrupt = (): void => {
-    if (busy && currentAbort) currentAbort.abort(new OmcbError("timeout", "interrupted by user"));
-    else exit();
+    if (busy && currentAbort) {
+      currentAbort.abort(new OmcbError("timeout", "interrupted by user"));
+      return;
+    }
+    const now = Date.now();
+    if (now - lastExitPress < 1500) {
+      exit();
+      return;
+    }
+    lastExitPress = now;
+    store.addNotice("Press Ctrl+C again to exit.");
   };
 
   await driver.init();
