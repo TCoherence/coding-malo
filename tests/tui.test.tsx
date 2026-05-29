@@ -1,5 +1,5 @@
 import { render } from "ink-testing-library";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { Store } from "../src/core/store";
 import type { OmcbEvent } from "../src/core/events";
@@ -116,5 +116,44 @@ describe("TUI App", () => {
     stdin.write("[A"); // up arrow → recall
     await tick();
     expect(lastFrame() ?? "").toContain("hello world");
+  });
+
+  it("shows a spinner while generating", async () => {
+    const store = new Store();
+    const { lastFrame, unmount } = render(<App store={store} onSubmit={() => {}} onInterrupt={() => {}} />);
+    store.setBusy(true);
+    await tick();
+    expect(lastFrame() ?? "").toContain("生成中");
+    unmount(); // clear the spinner interval
+  });
+
+  it("renders an Edit tool card as a -/+ diff", async () => {
+    const store = new Store();
+    const { lastFrame } = render(<App store={store} onSubmit={() => {}} onInterrupt={() => {}} />);
+    store.apply({ type: "init", session_id: "s", model: "m", provider: "anthropic", workspace: "/tmp", tools: [], mcp_servers: [], max_turns: 25 });
+    store.apply({ type: "tool_start", tool_id: "t1", name: "Edit", input: { file_path: "a.ts", old_string: "foo", new_string: "bar" }, source: "builtin", agent_id: "root" });
+    store.apply({ type: "tool_result", tool_id: "t1", name: "Edit", output: "Edited a.ts", is_error: false });
+    await tick();
+    const f = lastFrame() ?? "";
+    expect(f).toContain("- foo");
+    expect(f).toContain("+ bar");
+  });
+
+  it("/model picker: arrow-key select + enter confirms", async () => {
+    const store = new Store();
+    const onSelectModel = vi.fn();
+    const { lastFrame, stdin, unmount } = render(
+      <App store={store} onSubmit={() => {}} onInterrupt={() => {}} onSelectModel={onSelectModel} />,
+    );
+    store.openModelPicker(["deepseek-v4-flash", "deepseek-v4-pro", "gpt-4o"], "deepseek-v4-flash");
+    await tick();
+    expect(lastFrame() ?? "").toContain("选择模型");
+    expect(lastFrame() ?? "").toContain("deepseek-v4-pro");
+    stdin.write(String.fromCharCode(27) + "[B"); // down arrow → index 1
+    await tick();
+    stdin.write("\r"); // confirm
+    await tick();
+    expect(onSelectModel).toHaveBeenCalledWith("deepseek-v4-pro");
+    unmount();
   });
 });

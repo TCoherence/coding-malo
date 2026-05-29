@@ -33,6 +33,8 @@ export interface StoreState {
   /** Front of this queue is rendered as an approval modal; resolved via resolveApproval(). */
   approvalQueue: ApprovalRequest[];
   plan: PlanState | null;
+  /** When open, the /model picker overlay (arrow-key select). */
+  modelPicker: { items: string[]; index: number } | null;
 }
 
 function initialState(): StoreState {
@@ -46,6 +48,7 @@ function initialState(): StoreState {
     status: "idle",
     approvalQueue: [],
     plan: null,
+    modelPicker: null,
   };
 }
 
@@ -122,6 +125,21 @@ export class Store {
 
   clearTranscript(): void {
     this.set((s) => ({ ...s, transcript: [], live: null, liveTools: [] }));
+  }
+
+  openModelPicker(items: string[], current?: string): void {
+    const index = current && items.indexOf(current) >= 0 ? items.indexOf(current) : 0;
+    this.set((s) => ({ ...s, modelPicker: { items, index } }));
+  }
+  movePicker(delta: number): void {
+    this.set((s) => {
+      if (!s.modelPicker || s.modelPicker.items.length === 0) return s;
+      const n = s.modelPicker.items.length;
+      return { ...s, modelPicker: { ...s.modelPicker, index: (s.modelPicker.index + delta + n) % n } };
+    });
+  }
+  closeModelPicker(): void {
+    this.set((s) => ({ ...s, modelPicker: null }));
   }
 
   /** Called by the TuiPrompter: enqueue an approval request and resolve when the user decides. */

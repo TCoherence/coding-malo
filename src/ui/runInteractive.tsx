@@ -137,9 +137,11 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
         case "model": {
           if (!args) {
             const avail = driver.availableModels();
-            store.addNotice(
-              `当前模型: ${driver.getModel()}${avail.length ? `  ·  可选档案: ${avail.join(", ")}` : ""}。用 /model <名字> 切换。`,
-            );
+            if (avail.length > 0) {
+              store.openModelPicker(avail, driver.getModel());
+            } else {
+              store.addNotice(`当前模型: ${driver.getModel()}。config.json 里没有 models 档案；用 /model <id> 直接指定。`);
+            }
           } else {
             driver.setModel(args);
             store.setModel(driver.getModel());
@@ -179,11 +181,18 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
     if (typeof exitTimer.unref === "function") exitTimer.unref();
   };
 
+  const selectModel = (name: string): void => {
+    driver.setModel(name);
+    store.setModel(driver.getModel());
+    store.addNotice(`已切换 → ${driver.getModel()}`);
+  };
+
   await driver.init();
   await driver.hookRunner().fire("SessionStart", { mode: "interactive" });
-  const instance = render(<App store={store} onSubmit={onSubmit} onInterrupt={onInterrupt} />, {
-    exitOnCtrlC: false,
-  });
+  const instance = render(
+    <App store={store} onSubmit={onSubmit} onInterrupt={onInterrupt} onSelectModel={selectModel} />,
+    { exitOnCtrlC: false },
+  );
   await finished;
   store.cancelPendingApprovals(); // unblock any awaited approval before tearing down
   store.flush();

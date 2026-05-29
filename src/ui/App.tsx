@@ -1,5 +1,5 @@
 import { Box, Static, Text, useInput } from "ink";
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import type { ReactElement } from "react";
 
 import type { Store, StoreState, ToolCard, TranscriptItem } from "../core/store";
@@ -8,6 +8,76 @@ import type { ApprovalRequest } from "../permissions/types";
 function truncate(s: string, max: number): string {
   const oneLine = s.replace(/\s+/g, " ").trim();
   return oneLine.length > max ? oneLine.slice(0, max) + "…" : oneLine;
+}
+
+/** Keep at most `max` lines; report how many were hidden. */
+function clampLines(s: string, max: number): { text: string; hidden: number } {
+  const lines = s.split("\n");
+  if (lines.length <= max) return { text: s, hidden: 0 };
+  return { text: lines.slice(0, max).join("\n"), hidden: lines.length - max };
+}
+
+const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+function Spinner(): ReactElement {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setI((x) => (x + 1) % SPINNER_FRAMES.length), 80);
+    return () => clearInterval(t);
+  }, []);
+  return <Text color="yellow">{SPINNER_FRAMES[i]}</Text>;
+}
+
+function EditDiff({ input }: { input: unknown }): ReactElement {
+  const i = (input ?? {}) as { old_string?: string; new_string?: string };
+  const olds = (i.old_string ?? "").split("\n").slice(0, 6);
+  const news = (i.new_string ?? "").split("\n").slice(0, 6);
+  return (
+    <Box flexDirection="column">
+      {olds.map((l, k) => (
+        <Text key={`o${k}`} color="red">
+          - {l}
+        </Text>
+      ))}
+      {news.map((l, k) => (
+        <Text key={`n${k}`} color="green">
+          + {l}
+        </Text>
+      ))}
+    </Box>
+  );
+}
+
+function WriteDiff({ input }: { input: unknown }): ReactElement {
+  const lines = (((input ?? {}) as { content?: string }).content ?? "").split("\n");
+  const shown = lines.slice(0, 8);
+  return (
+    <Box flexDirection="column">
+      {shown.map((l, k) => (
+        <Text key={k} color="green">
+          + {l}
+        </Text>
+      ))}
+      {lines.length > 8 ? <Text dimColor>… 其余 {lines.length - 8} 行</Text> : null}
+    </Box>
+  );
+}
+
+function ModelPicker({ picker }: { picker: NonNullable<StoreState["modelPicker"]> }): ReactElement {
+  return (
+    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
+      <Text bold>选择模型 · ↑↓ 移动 · 回车确认 · esc 取消</Text>
+      {picker.items.length === 0 ? (
+        <Text dimColor>（config.json 里还没配置 models 档案）</Text>
+      ) : (
+        picker.items.map((name, i) => (
+          <Text key={name} color={i === picker.index ? "cyan" : undefined} inverse={i === picker.index}>
+            {i === picker.index ? "❯ " : "  "}
+            {name}
+          </Text>
+        ))
+      )}
+    </Box>
+  );
 }
 
 /** Pick the most readable argument to label a tool call (command, path, prompt, …). */
@@ -55,16 +125,25 @@ function TranscriptLine({ item }: { item: TranscriptItem }): ReactElement {
           </Text>
         </Box>
       );
-    case "tool":
+    case "tool": {
+      const isEdit = item.name === "Edit" || item.name === "MultiEdit";
+      const isWrite = item.name === "Write";
+      const folded = clampLines(item.output, 8);
       return (
         <Box flexDirection="column" borderStyle="round" borderColor={item.isError ? "red" : "gray"} paddingX={1}>
           <Text color={item.isError ? "red" : "magenta"}>
             {item.isError ? "✗" : "⚙"} <Text bold>{item.name}</Text>
             <Text dimColor> {truncate(toolArgSummary(item.input), 80)}</Text>
           </Text>
-          {item.output ? <Text dimColor>{truncate(item.output, 300)}</Text> : null}
+          {isEdit ? <EditDiff input={item.input} /> : null}
+          {isWrite ? <WriteDiff input={item.input} /> : null}
+          {!isEdit && !isWrite && item.output ? <Text dimColor>{folded.text}</Text> : null}
+          {!isEdit && !isWrite && folded.hidden > 0 ? (
+            <Text dimColor>… 其余 {folded.hidden} 行已折叠</Text>
+          ) : null}
         </Box>
       );
+    }
     case "notice":
       return <Text color={item.isError ? "red" : "yellow"}>{item.text}</Text>;
   }
@@ -197,10 +276,12 @@ export function App({
   store,
   onSubmit,
   onInterrupt,
+  onSelectModel,
 }: {
   store: Store;
   onSubmit: (text: string) => void;
   onInterrupt: () => void;
+  onSelectModel?: (name: string) => void;
 }): ReactElement {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const [history, setHistory] = useState<string[]>([]);
@@ -210,10 +291,23 @@ export function App({
   };
 
   const pendingApproval = state.approvalQueue[0];
+  const picker = state.modelPicker;
 
   useInput((input, key) => {
     if (key.ctrl && input === "c") {
       onInterrupt();
+      return;
+    }
+    if (picker) {
+      if (key.upArrow) store.movePicker(-1);
+      else if (key.downArrow) store.movePicker(1);
+      else if (key.return) {
+        const sel = picker.items[picker.index];
+        store.closeModelPicker();
+        if (sel && onSelectModel) onSelectModel(sel);
+      } else if (key.escape) {
+        store.closeModelPicker();
+      }
       return;
     }
     if (pendingApproval) {
@@ -235,10 +329,15 @@ export function App({
       ))}
       <PlanPanel state={state} />
       <Footer state={state} />
-      {pendingApproval ? (
+      {picker ? (
+        <ModelPicker picker={picker} />
+      ) : pendingApproval ? (
         <ApprovalModal req={pendingApproval} />
       ) : state.busy ? (
-        <Text dimColor>… working (Ctrl+C to interrupt)</Text>
+        <Box>
+          <Spinner />
+          <Text dimColor> 生成中…（Ctrl+C 中断）</Text>
+        </Box>
       ) : (
         <Box flexDirection="column">
           <Prompt onSubmit={submit} history={history} />
