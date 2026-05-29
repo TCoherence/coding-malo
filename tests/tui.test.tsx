@@ -1,0 +1,43 @@
+import { render } from "ink-testing-library";
+import { describe, expect, it } from "vitest";
+
+import { Store } from "../src/core/store";
+import type { OmcbEvent } from "../src/core/events";
+import { App } from "../src/ui/App";
+
+const tick = () => new Promise((r) => setTimeout(r, 40));
+
+describe("TUI App", () => {
+  it("renders the user prompt, streamed assistant text, and a tool card", async () => {
+    const store = new Store();
+    const { lastFrame } = render(<App store={store} onSubmit={() => {}} onInterrupt={() => {}} />);
+
+    const init: OmcbEvent = {
+      type: "init",
+      session_id: "sess_x",
+      model: "claude-sonnet-4-6",
+      provider: "anthropic",
+      workspace: "/tmp",
+      tools: ["Bash"],
+      mcp_servers: [],
+      max_turns: 25,
+    };
+
+    store.addUser("list the files");
+    store.apply(init);
+    store.apply({ type: "message_start", role: "assistant", agent_id: "root" });
+    store.apply({ type: "text_delta", text: "Sure, ", agent_id: "root" });
+    store.apply({ type: "text_delta", text: "running it.", agent_id: "root" });
+    store.apply({ type: "tool_start", tool_id: "t1", name: "Bash", input: { command: "ls" }, source: "builtin", agent_id: "root" });
+    store.apply({ type: "tool_result", tool_id: "t1", name: "Bash", output: "file_a.txt", is_error: false });
+    store.apply({ type: "message_stop", stop_reason: "tool_use", agent_id: "root" });
+    await tick();
+
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("list the files");
+    expect(frame).toContain("running it.");
+    expect(frame).toContain("Bash");
+    expect(frame).toContain("file_a.txt");
+    expect(frame).toContain("anthropic/claude-sonnet-4-6");
+  });
+});
