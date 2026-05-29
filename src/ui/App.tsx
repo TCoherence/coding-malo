@@ -19,38 +19,40 @@ function toolArgSummary(input: unknown): string {
   return JSON.stringify(i);
 }
 
-function Header({ state }: { state: StoreState }): ReactElement | null {
-  const h = state.header;
-  if (!h) return null;
+function Banner({ model, cwd }: { model: string; cwd: string }): ReactElement {
   return (
-    <Box marginBottom={1}>
+    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1} marginBottom={1}>
       <Text color="cyan" bold>
-        ● omcb{"  "}
+        ● oh-my-coding-buddy
       </Text>
-      <Text dimColor>{h.provider}/</Text>
-      <Text color="cyan">{h.model}</Text>
       <Text dimColor>
-        {"  ·  "}
-        {h.workspace}
+        模型 {model}  ·  {cwd}
       </Text>
+      <Text dimColor>输入消息开始 · /help 命令 · /model 切换模型 · /quit 退出</Text>
     </Box>
   );
 }
 
 function TranscriptLine({ item }: { item: TranscriptItem }): ReactElement {
   switch (item.kind) {
+    case "banner":
+      return <Banner model={item.model} cwd={item.cwd} />;
     case "user":
       return (
-        <Box>
-          <Text color="cyan">› </Text>
-          <Text>{item.text}</Text>
+        <Box marginTop={1}>
+          <Text color="cyan" bold>
+            › {item.text}
+          </Text>
         </Box>
       );
     case "assistant":
       return (
-        <Box flexDirection="column">
-          {item.thinking ? <Text dimColor italic>{truncate(item.thinking, 200)}</Text> : null}
-          <Text>{item.text}</Text>
+        <Box flexDirection="column" marginTop={1}>
+          {item.thinking ? <Text dimColor italic>  {truncate(item.thinking, 200)}</Text> : null}
+          <Text>
+            <Text color="green">⏺ </Text>
+            {item.text}
+          </Text>
         </Box>
       );
     case "tool":
@@ -183,7 +185,7 @@ function Prompt({ onSubmit, history }: { onSubmit: (text: string) => void; histo
     }
   });
   return (
-    <Box>
+    <Box borderStyle="round" borderColor="cyan" paddingX={1}>
       <Text color="cyan">› </Text>
       <Text>{value}</Text>
       <Text inverse> </Text>
@@ -224,7 +226,6 @@ export function App({
 
   return (
     <Box flexDirection="column">
-      <Header state={state} />
       <Static items={state.transcript}>
         {(item: TranscriptItem, index: number) => <TranscriptLine key={index} item={item} />}
       </Static>

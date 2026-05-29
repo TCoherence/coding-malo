@@ -20,6 +20,8 @@ const PRICING: Record<string, ModelPricing> = {
   // DeepSeek (cacheRead = cache-hit price; DeepSeek has no separate cache-write charge)
   "deepseek-chat": { inputPerMtok: 0.27, outputPerMtok: 1.1, cacheReadPerMtok: 0.07, cacheWritePerMtok: 0.27 },
   "deepseek-reasoner": { inputPerMtok: 0.55, outputPerMtok: 2.19, cacheReadPerMtok: 0.14, cacheWritePerMtok: 0.55 },
+  // 占位估算 — 请按 DeepSeek 实际定价调整（成本仅用于 TUI 显示，不影响功能）
+  "deepseek-v4-flash": { inputPerMtok: 0.1, outputPerMtok: 0.4, cacheReadPerMtok: 0.02, cacheWritePerMtok: 0.1 },
   // OpenAI
   "gpt-4o": { inputPerMtok: 2.5, outputPerMtok: 10, cacheReadPerMtok: 1.25, cacheWritePerMtok: 2.5 },
   "gpt-4o-mini": { inputPerMtok: 0.15, outputPerMtok: 0.6, cacheReadPerMtok: 0.075, cacheWritePerMtok: 0.15 },

@@ -1,24 +1,24 @@
 {
-  "//": "复制到 ~/.omcb/config.json（全局）或 <项目>/.omcb/config.json（项目级）。密钥用 ${env:XXX} 引用 .env，不要写明文。'model' 必须填你在该 provider 控制台里确切可用的模型 id（omcb 原样发给 API，不做任何映射）。运行时用 /model <名字> 或 --model <名字> 切换。",
+  "//": "复制到 ~/.omcb/config.json（全局）或 <项目>/.omcb/config.json（项目级）。密钥用 ${env:XXX} 引用 .env，不要直接写明文。运行时用 /model <名字> 或 --model <名字> 切换。",
 
-  "defaultModel": "deepseek",
+  "defaultModel": "deepseek-v4-flash",
 
   "models": {
-    "deepseek": {
+    "deepseek-v4-flash": {
       "provider": "anthropic",
       "model": "deepseek-v4-flash",
       "baseUrl": "https://api.deepseek.com/anthropic",
       "apiKey": "${env:DEEPSEEK_API_KEY}"
     },
-    "deepseek-r": {
+    "deepseek-v4-pro": {
       "provider": "anthropic",
-      "model": "deepseek-reasoner",
+      "model": "deepseek-v4-pro",
       "baseUrl": "https://api.deepseek.com/anthropic",
       "apiKey": "${env:DEEPSEEK_API_KEY}"
     },
     "deepseek-oai": {
       "provider": "openai-compat",
-      "model": "deepseek-v4-flash",
+      "model": "deepseek-chat",
       "baseUrl": "https://api.deepseek.com",
       "apiKey": "${env:DEEPSEEK_API_KEY}"
     },

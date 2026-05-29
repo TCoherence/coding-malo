@@ -34,6 +34,7 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
     ...(opts.history ? { history: opts.history } : {}),
     ...(opts.appendSystemPrompt ? { appendSystemPrompt: opts.appendSystemPrompt } : {}),
   });
+  store.addBanner(driver.getModel(), opts.workspace);
 
   let busy = false;
   let currentAbort: AbortController | null = null;

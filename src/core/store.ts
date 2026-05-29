@@ -9,6 +9,7 @@ export interface ToolCard {
 }
 
 export type TranscriptItem =
+  | { kind: "banner"; model: string; cwd: string }
   | { kind: "user"; text: string }
   | { kind: "assistant"; text: string; thinking?: string }
   | { kind: "tool"; id: string; name: string; input: unknown; output: string; isError: boolean }
@@ -105,6 +106,10 @@ export class Store {
 
   addUser(text: string): void {
     this.set((s) => ({ ...s, transcript: [...s.transcript, { kind: "user", text }] }));
+  }
+
+  addBanner(model: string, cwd: string): void {
+    this.set((s) => ({ ...s, transcript: [{ kind: "banner", model, cwd }, ...s.transcript] }));
   }
 
   addNotice(text: string, isError = false): void {
