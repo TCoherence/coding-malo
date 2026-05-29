@@ -117,16 +117,20 @@ describe("TUI e2e: resize", () => {
       return -1;
     };
 
+    // footer status lines, matched structurally (↑N ↓N · $cost) — not a loose substring
+    const statusCount = () => sess.screen().split("\n").filter((l) => /↑\d+ ↓\d+ · \$/.test(l)).length;
+
     sess.resize(60, 40);
-    // wait for the layout to settle at the new width (the bottom-most border becomes ~60),
-    // not a transient mid-reflow fragment
+    // Wait for the SETTLED clean repaint (debounced): bottom border ~60 AND a single footer.
+    // Ink's own resize render briefly shows a duplicated/overlapping frame before our repaint.
     await sess.waitFor(() => {
       const w = lastBorderWidth();
-      return w >= 56 && w <= 60;
+      return w >= 56 && w <= 60 && statusCount() === 1;
     }, 8000);
     const narrow = lastBorderWidth();
     expect(narrow).toBeLessThan(wide);
     expect(narrow).toBeGreaterThanOrEqual(56);
     expect(narrow).toBeLessThanOrEqual(60);
+    expect(statusCount()).toBe(1); // no duplicated/overlapping frames after the repaint settles
   });
 });

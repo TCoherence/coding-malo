@@ -35,6 +35,8 @@ export interface StoreState {
   plan: PlanState | null;
   /** When open, the /model picker overlay (arrow-key select). */
   modelPicker: { items: string[]; index: number } | null;
+  /** Bumped on terminal resize to force <Static> to remount and re-emit at the new width. */
+  staticEpoch: number;
 }
 
 function initialState(): StoreState {
@@ -49,6 +51,7 @@ function initialState(): StoreState {
     approvalQueue: [],
     plan: null,
     modelPicker: null,
+    staticEpoch: 0,
   };
 }
 
@@ -126,6 +129,11 @@ export class Store {
 
   clearTranscript(): void {
     this.set((s) => ({ ...s, transcript: [], live: null, liveTools: [] }));
+  }
+
+  /** Force <Static> to re-emit (used on terminal resize for a clean repaint at the new width). */
+  bumpStaticEpoch(): void {
+    this.set((s) => ({ ...s, staticEpoch: s.staticEpoch + 1 }));
   }
 
   openModelPicker(items: string[], current?: string): void {

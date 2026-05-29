@@ -148,7 +148,17 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
           return;
         }
         case "clear":
+          // Never clear away a pending approval modal — its promise would be orphaned and the turn
+          // would hang. (Normally the modal replaces the prompt, so this is defensive.)
+          if (store.getSnapshot().approvalQueue.length > 0) {
+            store.addNotice("有待确认的操作，请先处理审批再 /clear", true);
+            return;
+          }
+          // wipe the terminal (incl. scrollback) so already-emitted <Static> lines are gone too,
+          // then drop the transcript and remount <Static>.
+          process.stdout.write("\x1b[2J\x1b[3J\x1b[H");
           store.clearTranscript();
+          store.bumpStaticEpoch();
           return;
         case "cost": {
           const u = store.getSnapshot().usage;

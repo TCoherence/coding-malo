@@ -97,4 +97,29 @@ describe("TUI e2e (real PTY + headless xterm)", () => {
     expect(cur.y).toBe(promptRow());
     expect(cur.x).toBe(PREFIX + 5 + 4); // "hello"(5) + "中文"(2×width-2 = 4)
   });
+
+  it("/clear wipes the screen (banner and history gone), prompt stays", async () => {
+    const sess = new TuiSession({ env: env({ CODINGMALO_SPLASH: "0" }) });
+    session = sess;
+    const BANNER = "一只爱写代码的猴子"; // version-independent banner subtitle (only in the banner)
+    await sess.waitFor((s) => s.includes(BANNER)); // banner present
+    await sess.settle(150);
+    sess.type("/clear");
+    sess.enter();
+    await sess.waitFor((s) => !s.includes(BANNER)); // banner cleared from the screen
+    expect(sess.screen()).not.toContain(BANNER);
+    expect(sess.screen()).toContain("›"); // input still usable
+  });
+
+  it("double Ctrl-C exits (single press just arms it)", async () => {
+    const sess = new TuiSession({ env: env({ CODINGMALO_SPLASH: "0" }) });
+    session = sess;
+    await sess.waitFor((s) => s.includes("›"));
+    sess.ctrlC();
+    await sess.waitFor((s) => s.includes("Press Ctrl+C again to exit"));
+    expect(sess.hasExited()).toBe(false); // one press only arms
+    sess.ctrlC();
+    await sess.waitFor(() => sess.hasExited());
+    expect(sess.hasExited()).toBe(true);
+  });
 });
