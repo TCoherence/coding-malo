@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { Store } from "../src/core/store";
 import type { OmcbEvent } from "../src/core/events";
 import { App } from "../src/ui/App";
+import { VERSION } from "../src/version";
 
 const tick = () => new Promise((r) => setTimeout(r, 40));
 
@@ -116,6 +117,17 @@ describe("TUI App", () => {
     stdin.write("[A"); // up arrow → recall
     await tick();
     expect(lastFrame() ?? "").toContain("hello world");
+  });
+
+  it("welcome banner shows the MALO logo, model and version", async () => {
+    const store = new Store();
+    const { lastFrame } = render(<App store={store} onSubmit={() => {}} onInterrupt={() => {}} />);
+    store.addBanner("deepseek-v4-flash", "/tmp/ws");
+    await tick();
+    const f = lastFrame() ?? "";
+    expect(f).toContain("MALO");
+    expect(f).toContain(`v${VERSION}`);
+    expect(f).toContain("deepseek-v4-flash");
   });
 
   it("shows a spinner while generating", async () => {

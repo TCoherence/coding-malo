@@ -189,6 +189,11 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
 
   await driver.init();
   await driver.hookRunner().fire("SessionStart", { mode: "interactive" });
+  // Take over the terminal: clear screen + scrollback so omcb starts clean from the top.
+  if (process.stdout.isTTY) {
+    const ESC = String.fromCharCode(27);
+    process.stdout.write(`${ESC}[2J${ESC}[3J${ESC}[H`);
+  }
   const instance = render(
     <App store={store} onSubmit={onSubmit} onInterrupt={onInterrupt} onSelectModel={selectModel} />,
     { exitOnCtrlC: false },

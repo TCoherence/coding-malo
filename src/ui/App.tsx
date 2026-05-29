@@ -4,6 +4,7 @@ import type { ReactElement } from "react";
 
 import type { Store, StoreState, ToolCard, TranscriptItem } from "../core/store";
 import type { ApprovalRequest } from "../permissions/types";
+import { VERSION } from "../version";
 
 function truncate(s: string, max: number): string {
   const oneLine = s.replace(/\s+/g, " ").trim();
@@ -89,16 +90,33 @@ function toolArgSummary(input: unknown): string {
   return JSON.stringify(i);
 }
 
+const MALO_LOGO = ['  .-"-.  ', " c(o.o)ɔ ", "  >|m|<  "];
+
 function Banner({ model, cwd }: { model: string; cwd: string }): ReactElement {
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1} marginBottom={1}>
-      <Text color="cyan" bold>
-        ● oh-my-coding-buddy
-      </Text>
-      <Text dimColor>
-        模型 {model}  ·  {cwd}
-      </Text>
-      <Text dimColor>输入消息开始 · /help 命令 · /model 切换模型 · /quit 退出</Text>
+      <Box>
+        <Box flexDirection="column" marginRight={2}>
+          {MALO_LOGO.map((l, i) => (
+            <Text key={i} color="yellow">
+              {l}
+            </Text>
+          ))}
+        </Box>
+        <Box flexDirection="column">
+          <Text color="cyan" bold>
+            MALO <Text dimColor>v{VERSION}</Text>
+          </Text>
+          <Text dimColor>oh-my-coding-buddy 🐒</Text>
+          <Text dimColor>一只爱写代码的猴子</Text>
+        </Box>
+      </Box>
+      <Box marginTop={1} flexDirection="column">
+        <Text dimColor>
+          模型 {model}  ·  {cwd}
+        </Text>
+        <Text dimColor>/help 命令 · /model 切换 · /clear 清屏 · /quit 退出</Text>
+      </Box>
     </Box>
   );
 }

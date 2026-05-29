@@ -17,8 +17,7 @@ import { detectMode } from "./modes";
 import { HeadlessPrompter } from "./permissions/prompter";
 import type { PermissionMode, SandboxTier } from "./permissions/types";
 import { runInteractive } from "./ui/runInteractive";
-
-const VERSION = "0.0.0";
+import { VERSION } from "./version";
 
 const HELP = `omcb — oh-my-coding-buddy
 
