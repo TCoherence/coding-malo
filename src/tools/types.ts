@@ -49,7 +49,10 @@ export interface ToolResult {
 export interface Tool<I = any> {
   readonly name: string;
   readonly description: string;
-  readonly schema: ZodType<I>;
+  /** Zod schema for built-in tools (validates input). MCP tools carry `jsonSchema` instead. */
+  readonly schema?: ZodType<I>;
+  /** Raw JSON Schema (e.g. from an MCP server) when no Zod schema is available. */
+  readonly jsonSchema?: Record<string, unknown>;
   readonly permission: ToolPermissionSpec;
   readonly source: ToolSource;
   readonly mcpServer?: string;

@@ -1,6 +1,8 @@
 import type { ResolvedConfig } from "../config/load";
 import { HookRunner } from "../hooks/runner";
+import { loadMcpServers } from "../mcp/manager";
 import { discoverMemory } from "../memory/discover";
+import { discoverSkills, makeSkillTool, skillsSystemBlock } from "../skills/loader";
 import type { ApprovalStore } from "../permissions/approvals";
 import { PermissionEngine } from "../permissions/engine";
 import { sanitizeEnv } from "../permissions/sandbox";
@@ -10,7 +12,7 @@ import type { Provider } from "../providers/provider";
 import { builtinTools } from "../tools/builtins";
 import { ToolRegistry } from "../tools/registry";
 import { run } from "./engine";
-import type { OmcbEvent } from "./events";
+import type { McpServerStatus, OmcbEvent } from "./events";
 import { buildSystemPrompt } from "./system-prompt";
 import type { FinalResult, NormalizedMessage, UserInput } from "./types";
 
@@ -39,6 +41,9 @@ export class AgentDriver {
   private readonly env: Record<string, string>;
   private readonly hooks: HookRunner;
   private readonly memory: string;
+  private readonly skillsBlock: string;
+  private mcpStatuses: McpServerStatus[] = [];
+  private mcpClose: () => Promise<void> = async () => {};
 
   constructor(private readonly opts: DriverOptions) {
     this.conversation = opts.history ?? [];
@@ -63,10 +68,27 @@ export class AgentDriver {
     this.env = sanitizeEnv(opts.config.passthroughEnv, { OMA_AGENT_HOME: ".omcb" });
     this.hooks = new HookRunner(opts.config.hooks, this.env, opts.workspace);
     this.memory = discoverMemory(opts.workspace, opts.config.memoryFiles);
+
+    const skills = discoverSkills(opts.workspace);
+    if (skills.length > 0) this.registry.register(makeSkillTool(skills));
+    this.skillsBlock = skillsSystemBlock(skills);
   }
 
   hookRunner(): HookRunner {
     return this.hooks;
+  }
+
+  /** Connect MCP servers and register their tools. Call once before the first turn. */
+  async init(): Promise<void> {
+    if (this.opts.config.mcpServers.length === 0) return;
+    const result = await loadMcpServers(this.opts.config.mcpServers);
+    this.registry.registerAll(result.tools);
+    this.mcpStatuses = result.statuses;
+    this.mcpClose = result.close;
+  }
+
+  async close(): Promise<void> {
+    await this.mcpClose();
   }
 
   toolNames(): string[] {
@@ -81,13 +103,15 @@ export class AgentDriver {
       permissionMode: c.permissionMode,
       sandbox: c.sandbox,
     });
+    const systemPrompt = [base, this.memory, this.skillsBlock].filter((s) => s.length > 0).join("\n\n");
     return run(
       {
         provider: this.provider,
         registry: this.registry,
         permissions: this.permissions,
         hooks: this.hooks,
-        systemPrompt: this.memory ? `${base}\n\n${this.memory}` : base,
+        mcpServers: this.mcpStatuses,
+        systemPrompt,
         appendSystemPrompt: this.opts.appendSystemPrompt,
         maxTurns: c.maxTurns,
         model: c.model,

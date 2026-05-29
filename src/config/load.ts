@@ -6,7 +6,7 @@ import { OmcbError } from "../core/errors";
 import { omcbHome } from "../core/paths";
 import type { PermissionMode, SandboxTier } from "../permissions/types";
 import { OmcbConfigSchema } from "./schema";
-import type { HookDef, OmcbConfig } from "./schema";
+import type { HookDef, McpServerConfig, OmcbConfig } from "./schema";
 
 export interface ResolvedConfig {
   providerKind: "anthropic" | "openai-compat";
@@ -23,6 +23,7 @@ export interface ResolvedConfig {
   promptCaching?: boolean;
   hooks: HookDef[];
   memoryFiles: string[];
+  mcpServers: McpServerConfig[];
 }
 
 export interface ConfigOverrides {
@@ -157,5 +158,6 @@ export function resolveConfig(overrides: ConfigOverrides, workspace?: string): R
     ...(promptCaching !== undefined ? { promptCaching } : {}),
     hooks: file.hooks ?? [],
     memoryFiles: file.memory?.files ?? ["AGENTS.md", "CLAUDE.md"],
+    mcpServers: file.mcpServers ?? [],
   };
 }

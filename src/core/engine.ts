@@ -9,7 +9,7 @@ import type { Logger, ToolContext, ToolResultBlock } from "../tools/types";
 import { classifyApiError } from "./errors";
 import type { ErrorKind } from "./errors";
 import { usageToWire } from "./events";
-import type { OmcbEvent } from "./events";
+import type { McpServerStatus, OmcbEvent } from "./events";
 import type {
   ContentBlock,
   FinalResult,
@@ -54,6 +54,7 @@ export interface AgentLoopConfig {
   allowedTools?: string[];
   writer?: { writeMessage(m: NormalizedMessage): void };
   hooks?: HookRunner;
+  mcpServers?: McpServerStatus[];
   logger?: Logger;
 }
 
@@ -133,16 +134,21 @@ async function executeTool(
     if (pre.action === "modify" && pre.toolInput) rawInput = pre.toolInput;
   }
 
-  const parsed = tool.schema.safeParse(rawInput);
-  if (!parsed.success) {
-    return { output: `invalid input for ${call.name}: ${parsed.error.message}`, isError: true };
+  // Built-in tools validate via Zod; MCP tools (jsonSchema only) pass input through to the server.
+  let data: unknown = rawInput;
+  if (tool.schema) {
+    const parsed = tool.schema.safeParse(rawInput);
+    if (!parsed.success) {
+      return { output: `invalid input for ${call.name}: ${parsed.error.message}`, isError: true };
+    }
+    data = parsed.data;
   }
   try {
-    const decision = await cfg.permissions.evaluate(tool, parsed.data, ctx);
+    const decision = await cfg.permissions.evaluate(tool, data, ctx);
     if (!decision.allow) return { output: `Permission denied: ${decision.reason}`, isError: true };
-    const result = await tool.execute(parsed.data, ctx);
+    const result = await tool.execute(data, ctx);
     const output = normalizeToolOutput(result.content);
-    if (cfg.hooks) await cfg.hooks.postToolUse(call.name, parsed.data, output);
+    if (cfg.hooks) await cfg.hooks.postToolUse(call.name, data, output);
     return { output, isError: result.isError ?? false };
   } catch (err) {
     logger.error("tool execution failed", call.name, err);
@@ -188,7 +194,7 @@ export async function* run(
     provider: cfg.provider.name,
     workspace: cfg.workspace,
     tools: cfg.registry.names(cfg.allowedTools),
-    mcp_servers: [],
+    mcp_servers: cfg.mcpServers ?? [],
     max_turns: cfg.maxTurns,
   };
 

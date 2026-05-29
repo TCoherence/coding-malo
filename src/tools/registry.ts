@@ -35,7 +35,7 @@ export class ToolRegistry {
     return this.list(allowed).map((t) => ({
       name: t.name,
       description: t.description,
-      inputSchema: toInputSchema(t.schema),
+      inputSchema: t.jsonSchema ?? (t.schema ? toInputSchema(t.schema) : { type: "object", properties: {} }),
     }));
   }
 }

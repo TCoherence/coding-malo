@@ -225,6 +225,7 @@ async function main(): Promise<void> {
   process.once("SIGTERM", onSig);
 
   const images = loadImages(values.image);
+  await driver.init();
   await driver.hookRunner().fire("SessionStart", { mode: "print" });
   const gen = driver.runTurn({ text: promptText, ...(images ? { images } : {}) }, ac.signal);
   let step = await gen.next();
@@ -234,6 +235,7 @@ async function main(): Promise<void> {
   }
   const result = step.value;
   await driver.hookRunner().fire("SessionEnd", { mode: "print" });
+  await driver.close();
 
   persistMeta({
     sessionId,

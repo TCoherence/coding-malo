@@ -18,6 +18,18 @@ export const HookDefSchema = z.object({
 });
 export type HookDef = z.infer<typeof HookDefSchema>;
 
+export const McpServerSchema = z.object({
+  name: z.string(),
+  // stdio transport
+  command: z.string().optional(),
+  args: z.array(z.string()).optional(),
+  env: z.record(z.string(), z.string()).optional(),
+  // streamable-http transport
+  url: z.string().optional(),
+  timeoutMs: z.number().int().positive().optional(),
+});
+export type McpServerConfig = z.infer<typeof McpServerSchema>;
+
 /** The on-disk config (global ~/.omcb/config.json + project .omcb/config.json). All fields optional. */
 export const OmcbConfigSchema = z
   .object({
@@ -34,6 +46,7 @@ export const OmcbConfigSchema = z
     promptCaching: z.boolean().optional(),
     memory: z.object({ files: z.array(z.string()).optional() }).optional(),
     hooks: z.array(HookDefSchema).optional(),
+    mcpServers: z.array(McpServerSchema).optional(),
   })
   .strict();
 

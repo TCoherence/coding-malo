@@ -135,11 +135,13 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
     else exit();
   };
 
+  await driver.init();
   await driver.hookRunner().fire("SessionStart", { mode: "interactive" });
   const instance = render(<App store={store} onSubmit={onSubmit} onInterrupt={onInterrupt} />, {
     exitOnCtrlC: false,
   });
   await finished;
   await driver.hookRunner().fire("SessionEnd", { mode: "interactive" });
+  await driver.close();
   instance.unmount();
 }
