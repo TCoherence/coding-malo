@@ -103,6 +103,25 @@ export class TuiSession {
   ctrlC(): void {
     this.write("\x03");
   }
+  /** Resize both the PTY (the CLI gets SIGWINCH) and the emulator. */
+  resize(cols: number, rows: number): void {
+    try {
+      this.pty.resize(cols, rows);
+    } catch {
+      // pty may have exited
+    }
+    this.term.resize(cols, rows);
+  }
+
+  /** Width (in cells) of the bottom-most box border line — handy for resize assertions. */
+  bottomBorderWidth(): number {
+    const lines = this.screen().split("\n");
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const l = lines[i] ?? "";
+      if (l.includes("╰") || l.includes("╯")) return l.length;
+    }
+    return 0;
+  }
 
   /** Poll the rendered screen until `pred` holds, or throw with the last screen for debugging. */
   async waitFor(pred: (screen: string) => boolean, timeoutMs = 10000): Promise<void> {

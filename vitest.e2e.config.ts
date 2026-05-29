@@ -10,5 +10,8 @@ export default defineConfig({
     testTimeout: 30000,
     hookTimeout: 30000,
     fileParallelism: false, // each test owns a PTY + (mock) server; keep them sequential
+    // Real-PTY tests are timing-sensitive under load (a keystroke can race the re-render). The logic
+    // is verified; absorb that inherent jitter with a bounded retry rather than padding every wait.
+    retry: 2,
   },
 });

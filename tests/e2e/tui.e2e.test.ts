@@ -72,27 +72,28 @@ describe("TUI e2e (real PTY + headless xterm)", () => {
   });
 
   it("places the real cursor exactly on the caret — English, mid-string, and CJK (IME anchor, #4)", async () => {
-    session = new TuiSession({ env: env({ CODINGMALO_SPLASH: "0" }), rows: 40 });
-    await session.waitFor((s) => s.includes("›"));
-    const promptRow = () => session.screen().split("\n").findIndex((l) => l.includes("›"));
+    const sess = new TuiSession({ env: env({ CODINGMALO_SPLASH: "0" }), rows: 40 });
+    session = sess;
+    await sess.waitFor((s) => s.includes("›"));
+    const promptRow = () => sess.screen().split("\n").findIndex((l) => l.includes("›"));
     const PREFIX = 4; // box border(1) + paddingX(1) + "› "(2) before the text
 
-    session.type("hello");
-    await session.waitFor((s) => s.includes("hello"));
-    await session.settle(120);
-    let cur = session.cursor();
+    sess.type("hello");
+    await sess.waitFor((s) => s.includes("hello"));
+    await sess.settle(120);
+    let cur = sess.cursor();
     expect(cur.y).toBe(promptRow()); // cursor sits on the prompt line itself
     expect(cur.x).toBe(PREFIX + 5); // caret after "hello"
 
-    session.left(2); // caret to "hel|lo"
-    await session.settle(120);
-    expect(session.cursor().x).toBe(PREFIX + 3); // 3 columns of text before the caret
+    sess.left(2); // caret to "hel|lo"
+    await sess.settle(120);
+    expect(sess.cursor().x).toBe(PREFIX + 3); // 3 columns of text before the caret
 
-    session.right(2);
-    session.type("中文"); // two double-width chars
-    await session.waitFor((s) => s.includes("中文"));
-    await session.settle(120);
-    cur = session.cursor();
+    sess.right(2);
+    sess.type("中文"); // two double-width chars
+    await sess.waitFor((s) => s.includes("中文"));
+    await sess.settle(120);
+    cur = sess.cursor();
     expect(cur.y).toBe(promptRow());
     expect(cur.x).toBe(PREFIX + 5 + 4); // "hello"(5) + "中文"(2×width-2 = 4)
   });
