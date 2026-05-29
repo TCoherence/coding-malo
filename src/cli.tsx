@@ -84,6 +84,19 @@ function loadImages(paths: string[] | undefined): ImageInput[] | undefined {
   }));
 }
 
+/** Load a `.env` from the working dir (Node's built-in loader; no dependency). Best-effort. */
+function loadDotEnv(dir: string): void {
+  const file = path.join(dir, ".env");
+  const loader = (process as { loadEnvFile?: (p: string) => void }).loadEnvFile;
+  if (typeof loader === "function" && fs.existsSync(file)) {
+    try {
+      loader(file);
+    } catch {
+      /* ignore a malformed .env */
+    }
+  }
+}
+
 async function readStdin(): Promise<string> {
   if (process.stdin.isTTY) return "";
   const chunks: Buffer[] = [];
@@ -155,6 +168,7 @@ async function main(): Promise<void> {
   }
 
   const workspace = path.resolve(values.workspace ?? process.cwd());
+  loadDotEnv(workspace); // populate env from .env before resolving config
 
   const mode = detectMode({ print: Boolean(values.print), stdinIsTty: Boolean(process.stdin.isTTY) });
 

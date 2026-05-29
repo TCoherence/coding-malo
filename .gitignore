@@ -3,7 +3,14 @@ dist/
 coverage/
 *.log
 .DS_Store
+
+# Local env / secrets — never commit. Copy .env.example -> .env.
 .env
 .env.*
-.omcb-local/
+!.env.example
+
+# API key files
+*.key
+*.api.key
+
 *.tsbuildinfo
