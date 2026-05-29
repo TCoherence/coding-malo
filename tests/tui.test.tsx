@@ -119,6 +119,25 @@ describe("TUI App", () => {
     expect(lastFrame() ?? "").toContain("hello world");
   });
 
+  it("moves the caret with ←/→ and inserts mid-string", async () => {
+    const store = new Store();
+    let submitted: string | null = null;
+    const { stdin } = render(
+      <App store={store} onSubmit={(t) => (submitted = t)} onInterrupt={() => {}} />,
+    );
+    await tick();
+    stdin.write("abc"); // caret at end (3)
+    await tick();
+    stdin.write(String.fromCharCode(27) + "[D"); // ← caret 3→2
+    stdin.write(String.fromCharCode(27) + "[D"); // ← caret 2→1
+    await tick();
+    stdin.write("X"); // insert at caret(1) → "aXbc"
+    await tick();
+    stdin.write("\r"); // submit
+    await tick();
+    expect(submitted).toBe("aXbc");
+  });
+
   it("welcome banner shows the Coding Malo logo, model and version", async () => {
     const store = new Store();
     const { lastFrame } = render(<App store={store} onSubmit={() => {}} onInterrupt={() => {}} />);

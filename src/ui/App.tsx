@@ -249,25 +249,29 @@ function ApprovalModal({ req }: { req: ApprovalRequest }): ReactElement {
 
 function Prompt({ onSubmit, history }: { onSubmit: (text: string) => void; history: string[] }): ReactElement {
   const [value, setValue] = useState("");
+  const [cursor, setCursor] = useState(0); // caret index into value (0..value.length)
   const [histCursor, setHistCursor] = useState<number | null>(null); // null = editing a fresh line
+
+  const load = (text: string): void => {
+    setValue(text);
+    setCursor(text.length); // caret to end of the recalled line
+  };
+
   useInput((input, key) => {
     if (key.ctrl && (input === "c" || input === "d")) return; // handled at App level
     if (key.return) {
       const v = value;
       setValue("");
+      setCursor(0);
       setHistCursor(null);
       onSubmit(v);
-      return;
-    }
-    if (key.backspace || key.delete) {
-      setValue((v) => v.slice(0, -1));
       return;
     }
     if (key.upArrow) {
       if (history.length === 0) return;
       const next = histCursor === null ? history.length - 1 : Math.max(0, histCursor - 1);
       setHistCursor(next);
-      setValue(history[next] ?? "");
+      load(history[next] ?? "");
       return;
     }
     if (key.downArrow) {
@@ -275,24 +279,53 @@ function Prompt({ onSubmit, history }: { onSubmit: (text: string) => void; histo
       const next = histCursor + 1;
       if (next >= history.length) {
         setHistCursor(null);
-        setValue("");
+        load("");
       } else {
         setHistCursor(next);
-        setValue(history[next] ?? "");
+        load(history[next] ?? "");
       }
       return;
     }
-    if (key.tab || key.leftArrow || key.rightArrow || key.escape) return;
+    if (key.leftArrow) {
+      setCursor((c) => Math.max(0, c - 1));
+      return;
+    }
+    if (key.rightArrow) {
+      setCursor((c) => Math.min(value.length, c + 1));
+      return;
+    }
+    if (key.ctrl && input === "a") {
+      setCursor(0); // Home
+      return;
+    }
+    if (key.ctrl && input === "e") {
+      setCursor(value.length); // End
+      return;
+    }
+    if (key.backspace || key.delete) {
+      if (cursor <= 0) return;
+      setValue((v) => v.slice(0, cursor - 1) + v.slice(cursor)); // delete char before the caret
+      setCursor((c) => Math.max(0, c - 1));
+      setHistCursor(null);
+      return;
+    }
+    if (key.tab || key.escape) return;
     if (input && !key.ctrl && !key.meta) {
-      setValue((v) => v + input);
+      setValue((v) => v.slice(0, cursor) + input + v.slice(cursor)); // insert at the caret
+      setCursor((c) => c + input.length);
       setHistCursor(null);
     }
   });
+
+  const before = value.slice(0, cursor);
+  const atChar = value.slice(cursor, cursor + 1) || " ";
+  const after = value.slice(cursor + 1);
   return (
     <Box borderStyle="round" borderColor="cyan" paddingX={1}>
       <Text color="cyan">› </Text>
-      <Text>{value}</Text>
-      <Text inverse> </Text>
+      <Text>{before}</Text>
+      <Text inverse>{atChar}</Text>
+      <Text>{after}</Text>
     </Box>
   );
 }
@@ -365,8 +398,10 @@ export function App({
         </Box>
       ) : (
         <Box flexDirection="column">
+          {/* hint ABOVE the input so the prompt is the last rendered line — keeps the real
+              terminal cursor (and thus the IME candidate window) right at the input box. */}
+          <Text dimColor>/help · /model · /clear · /quit · ←→ 移动 · ↑↓ history</Text>
           <Prompt onSubmit={submit} history={history} />
-          <Text dimColor>/help · /model · /clear · /quit · ↑↓ history</Text>
         </Box>
       )}
     </Box>

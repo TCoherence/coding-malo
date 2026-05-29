@@ -217,13 +217,15 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
   let altActive = false;
   const enterAlt = (): void => {
     if (useAlt && !altActive) {
-      process.stdout.write(`${ESC}[?1049h${ESC}[H`);
+      // alt screen + disable "alternate scroll" (1007) so the mouse wheel stops emitting ↑/↓
+      // (which were hijacking input history); + home cursor.
+      process.stdout.write(`${ESC}[?1049h${ESC}[?1007l${ESC}[H`);
       altActive = true;
     }
   };
   const leaveAlt = (): void => {
     if (altActive) {
-      process.stdout.write(`${ESC}[?1049l`);
+      process.stdout.write(`${ESC}[?1007h${ESC}[?1049l`); // restore alt-scroll, leave alt screen
       altActive = false;
     }
   };
@@ -237,6 +239,7 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
       const cols = Math.max(20, Math.min((process.stdout.columns ?? 80) - 4, 60));
       const big = await renderImageHalfBlocks(logoPath, { maxCols: cols, bgThreshold });
       await runSplash(big);
+      process.stdout.write(`${ESC}[2J${ESC}[H`); // wipe the splash before the app mounts
     } catch {
       // ignore splash failures and fall through to the app
     }
