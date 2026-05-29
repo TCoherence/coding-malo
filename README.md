@@ -35,7 +35,12 @@ node dist/cli.js -p "list files"       # headless NDJSON
 echo "summarize README" | node dist/cli.js
 ```
 
-Set `ANTHROPIC_API_KEY` (and optionally `ANTHROPIC_BASE_URL` / `OMCB_BASE_URL` for a gateway).
+Set `ANTHROPIC_API_KEY` (and optionally `ANTHROPIC_BASE_URL` / `OMCB_BASE_URL` for a gateway), or
+copy `.env.example` → `.env` (auto-loaded, gitignored).
+
+**Interactive commands:** `/model [id]` (switch model live; configure a picker list via `models: [...]`
+in `.omcb/config.json`), `/help`, `/clear`, `/cost`, `/quit`, plus markdown commands in `.omcb/commands/`.
+`↑/↓` recall history. Tool calls render as live cards; the header shows the active model.
 
 ## Headless protocol (NDJSON)
 

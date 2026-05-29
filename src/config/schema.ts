@@ -34,6 +34,8 @@ export type McpServerConfig = z.infer<typeof McpServerSchema>;
 export const OmcbConfigSchema = z
   .object({
     defaultModel: z.string().optional(),
+    /** Models offered by the `/model` picker (free-form `/model <id>` always works too). */
+    models: z.array(z.string()).optional(),
     provider: z.enum(["anthropic", "openai-compat"]).optional(),
     baseUrl: z.string().optional(),
     maxTurns: z.number().int().positive().optional(),

@@ -111,6 +111,14 @@ export class Store {
     this.set((s) => ({ ...s, transcript: [...s.transcript, { kind: "notice", text, ...(isError ? { isError: true } : {}) }] }));
   }
 
+  setModel(model: string): void {
+    this.set((s) => ({ ...s, header: s.header ? { ...s.header, model } : s.header }));
+  }
+
+  clearTranscript(): void {
+    this.set((s) => ({ ...s, transcript: [], live: null, liveTools: [] }));
+  }
+
   /** Called by the TuiPrompter: enqueue an approval request and resolve when the user decides. */
   requestApproval(req: ApprovalRequest): Promise<Decision> {
     return new Promise<Decision>((resolve) => {

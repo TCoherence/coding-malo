@@ -63,6 +63,33 @@ describe("TUI App", () => {
     expect(lastFrame() ?? "").not.toContain("Approval required");
   });
 
+  it("shows the model in the header and reflects /model switching", async () => {
+    const store = new Store();
+    const { lastFrame } = render(<App store={store} onSubmit={() => {}} onInterrupt={() => {}} />);
+    store.apply({
+      type: "init",
+      session_id: "s",
+      model: "claude-sonnet-4-6",
+      provider: "anthropic",
+      workspace: "/tmp/ws",
+      tools: [],
+      mcp_servers: [],
+      max_turns: 25,
+    });
+    await tick();
+    expect(lastFrame() ?? "").toContain("claude-sonnet-4-6");
+    store.setModel("deepseek-chat");
+    await tick();
+    expect(lastFrame() ?? "").toContain("deepseek-chat");
+  });
+
+  it("clears the transcript", async () => {
+    const store = new Store();
+    store.addUser("hello");
+    store.clearTranscript();
+    expect(store.getSnapshot().transcript).toEqual([]);
+  });
+
   it("coalesces many streamed deltas into a single notification", async () => {
     const store = new Store();
     let calls = 0;

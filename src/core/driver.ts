@@ -46,8 +46,10 @@ export class AgentDriver {
   private mcpStatuses: McpServerStatus[] = [];
   private mcpClose: () => Promise<void> = async () => {};
   private readonly taskManager = new TaskManager();
+  private currentModel: string;
 
   constructor(private readonly opts: DriverOptions) {
+    this.currentModel = opts.config.model;
     this.conversation = opts.history ?? [];
     this.registry = new ToolRegistry();
     this.registry.registerAll(builtinTools());
@@ -78,6 +80,16 @@ export class AgentDriver {
 
   hookRunner(): HookRunner {
     return this.hooks;
+  }
+
+  getModel(): string {
+    return this.currentModel;
+  }
+  setModel(model: string): void {
+    this.currentModel = model;
+  }
+  availableModels(): string[] {
+    return this.opts.config.models;
   }
 
   /** Connect MCP servers and register their tools. Call once before the first turn. */
@@ -123,7 +135,7 @@ export class AgentDriver {
         systemPrompt,
         appendSystemPrompt: this.opts.appendSystemPrompt,
         maxTurns: c.maxTurns,
-        model: c.model,
+        model: this.currentModel,
         maxTokens: c.maxTokens,
         parallelToolCalls: c.parallelToolCalls,
         signal,

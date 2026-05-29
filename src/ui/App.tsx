@@ -10,6 +10,33 @@ function truncate(s: string, max: number): string {
   return oneLine.length > max ? oneLine.slice(0, max) + "…" : oneLine;
 }
 
+/** Pick the most readable argument to label a tool call (command, path, prompt, …). */
+function toolArgSummary(input: unknown): string {
+  const i = (input ?? {}) as Record<string, unknown>;
+  for (const key of ["command", "file_path", "pattern", "prompt", "name", "url"]) {
+    if (typeof i[key] === "string") return i[key] as string;
+  }
+  return JSON.stringify(i);
+}
+
+function Header({ state }: { state: StoreState }): ReactElement | null {
+  const h = state.header;
+  if (!h) return null;
+  return (
+    <Box marginBottom={1}>
+      <Text color="cyan" bold>
+        ● omcb{"  "}
+      </Text>
+      <Text dimColor>{h.provider}/</Text>
+      <Text color="cyan">{h.model}</Text>
+      <Text dimColor>
+        {"  ·  "}
+        {h.workspace}
+      </Text>
+    </Box>
+  );
+}
+
 function TranscriptLine({ item }: { item: TranscriptItem }): ReactElement {
   switch (item.kind) {
     case "user":
@@ -28,12 +55,12 @@ function TranscriptLine({ item }: { item: TranscriptItem }): ReactElement {
       );
     case "tool":
       return (
-        <Box flexDirection="column" marginLeft={2}>
+        <Box flexDirection="column" borderStyle="round" borderColor={item.isError ? "red" : "gray"} paddingX={1}>
           <Text color={item.isError ? "red" : "magenta"}>
-            {item.isError ? "✗" : "⚙"} {item.name}
-            <Text dimColor> {truncate(JSON.stringify(item.input ?? {}), 80)}</Text>
+            {item.isError ? "✗" : "⚙"} <Text bold>{item.name}</Text>
+            <Text dimColor> {truncate(toolArgSummary(item.input), 80)}</Text>
           </Text>
-          <Text dimColor>{truncate(item.output, 240)}</Text>
+          {item.output ? <Text dimColor>{truncate(item.output, 300)}</Text> : null}
         </Box>
       );
     case "notice":
@@ -52,10 +79,13 @@ function LiveRegion({ live }: { live: NonNullable<StoreState["live"]> }): ReactE
 
 function RunningTool({ tool }: { tool: ToolCard }): ReactElement {
   return (
-    <Text color="yellow">
-      ⏳ {tool.name}
-      <Text dimColor> {truncate(JSON.stringify(tool.input ?? {}), 80)}</Text>
-    </Text>
+    <Box borderStyle="round" borderColor="yellow" paddingX={1}>
+      <Text color="yellow">
+        ⏳ <Text bold>{tool.name}</Text>
+        <Text dimColor> {truncate(toolArgSummary(tool.input), 80)}</Text>
+        <Text dimColor> · running…</Text>
+      </Text>
+    </Box>
   );
 }
 
@@ -194,6 +224,7 @@ export function App({
 
   return (
     <Box flexDirection="column">
+      <Header state={state} />
       <Static items={state.transcript}>
         {(item: TranscriptItem, index: number) => <TranscriptLine key={index} item={item} />}
       </Static>
@@ -208,7 +239,10 @@ export function App({
       ) : state.busy ? (
         <Text dimColor>… working (Ctrl+C to interrupt)</Text>
       ) : (
-        <Prompt onSubmit={submit} history={history} />
+        <Box flexDirection="column">
+          <Prompt onSubmit={submit} history={history} />
+          <Text dimColor>/help · /model · /clear · /quit · ↑↓ history</Text>
+        </Box>
       )}
     </Box>
   );

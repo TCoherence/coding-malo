@@ -114,10 +114,38 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
     if (trimmed.startsWith("/")) {
       const tokens = trimmed.slice(1).split(/\s+/);
       const name = tokens[0] ?? "";
-      const args = tokens.slice(1).join(" ");
-      if (name === "quit" || name === "exit") {
-        exit();
-        return;
+      const args = tokens.slice(1).join(" ").trim();
+      switch (name) {
+        case "quit":
+        case "exit":
+          exit();
+          return;
+        case "help": {
+          const custom = [...commands.keys()].map((c) => `/${c}`).join(" ");
+          store.addNotice(`Commands: /help · /model [id] · /clear · /cost · /quit${custom ? `  ·  custom: ${custom}` : ""}`);
+          return;
+        }
+        case "clear":
+          store.clearTranscript();
+          return;
+        case "cost": {
+          const u = store.getSnapshot().usage;
+          store.addNotice(`Usage: ↑${u.input} ↓${u.output}${u.cacheRead ? ` · cache ${u.cacheRead}` : ""} · $${u.cost.toFixed(4)}`);
+          return;
+        }
+        case "model": {
+          if (!args) {
+            const avail = driver.availableModels();
+            store.addNotice(
+              `Model: ${driver.getModel()}${avail.length ? `  ·  configured: ${avail.join(", ")}` : ""}. Switch with /model <id>.`,
+            );
+          } else {
+            driver.setModel(args);
+            store.setModel(args);
+            store.addNotice(`Model → ${args} (same provider/endpoint).`);
+          }
+          return;
+        }
       }
       const cmd = commands.get(name);
       if (cmd) {

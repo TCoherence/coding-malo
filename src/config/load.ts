@@ -24,6 +24,7 @@ export interface ResolvedConfig {
   hooks: HookDef[];
   memoryFiles: string[];
   mcpServers: McpServerConfig[];
+  models: string[];
 }
 
 export interface ConfigOverrides {
@@ -160,5 +161,6 @@ export function resolveConfig(overrides: ConfigOverrides, workspace?: string): R
     hooks: file.hooks ?? [],
     memoryFiles: file.memory?.files ?? ["AGENTS.md", "CLAUDE.md"],
     mcpServers: file.mcpServers ?? [],
+    models: file.models ?? [],
   };
 }
