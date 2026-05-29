@@ -7,6 +7,7 @@ import { writeMeta } from "../core/meta";
 import type { SessionMeta } from "../core/meta";
 import { Store } from "../core/store";
 import type { NormalizedMessage } from "../core/types";
+import { expandCommand, loadCommands } from "../commands/loader";
 import { ApprovalStore } from "../permissions/approvals";
 import { TuiPrompter } from "../permissions/tui-prompter";
 import { App } from "./App";
@@ -105,12 +106,25 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
     }
   };
 
+  const commands = loadCommands(opts.workspace);
   const onSubmit = (text: string): void => {
     if (busy) return;
     const trimmed = text.trim();
     if (trimmed.length === 0) return;
-    if (trimmed === "/quit" || trimmed === "/exit") {
-      exit();
+    if (trimmed.startsWith("/")) {
+      const tokens = trimmed.slice(1).split(/\s+/);
+      const name = tokens[0] ?? "";
+      const args = tokens.slice(1).join(" ");
+      if (name === "quit" || name === "exit") {
+        exit();
+        return;
+      }
+      const cmd = commands.get(name);
+      if (cmd) {
+        void runTurn(expandCommand(cmd, args));
+        return;
+      }
+      store.addNotice(`unknown command: /${name}`, true);
       return;
     }
     void runTurn(trimmed);
@@ -121,9 +135,11 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
     else exit();
   };
 
+  await driver.hookRunner().fire("SessionStart", { mode: "interactive" });
   const instance = render(<App store={store} onSubmit={onSubmit} onInterrupt={onInterrupt} />, {
     exitOnCtrlC: false,
   });
   await finished;
+  await driver.hookRunner().fire("SessionEnd", { mode: "interactive" });
   instance.unmount();
 }

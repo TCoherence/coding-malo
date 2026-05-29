@@ -72,6 +72,10 @@ export class Store {
     this.set((s) => ({ ...s, transcript: [...s.transcript, { kind: "user", text }] }));
   }
 
+  addNotice(text: string, isError = false): void {
+    this.set((s) => ({ ...s, transcript: [...s.transcript, { kind: "notice", text, ...(isError ? { isError: true } : {}) }] }));
+  }
+
   /** Called by the TuiPrompter: enqueue an approval request and resolve when the user decides. */
   requestApproval(req: ApprovalRequest): Promise<Decision> {
     return new Promise<Decision>((resolve) => {

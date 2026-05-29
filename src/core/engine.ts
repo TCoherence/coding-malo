@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import type { HookRunner } from "../hooks/runner";
 import type { PermissionEngine } from "../permissions/engine";
 import type { SandboxTier } from "../permissions/types";
 import type { Provider } from "../providers/provider";
@@ -52,6 +53,7 @@ export interface AgentLoopConfig {
   sandbox: SandboxTier;
   allowedTools?: string[];
   writer?: { writeMessage(m: NormalizedMessage): void };
+  hooks?: HookRunner;
   logger?: Logger;
 }
 
@@ -123,7 +125,15 @@ async function executeTool(
     logger,
   };
 
-  const parsed = tool.schema.safeParse(call.input);
+  // PreToolUse hook runs BEFORE the permission gate: it can block or rewrite the call.
+  let rawInput: unknown = call.input;
+  if (cfg.hooks) {
+    const pre = await cfg.hooks.preToolUse(call.name, rawInput);
+    if (pre.action === "block") return { output: `Blocked by PreToolUse hook: ${pre.reason}`, isError: true };
+    if (pre.action === "modify" && pre.toolInput) rawInput = pre.toolInput;
+  }
+
+  const parsed = tool.schema.safeParse(rawInput);
   if (!parsed.success) {
     return { output: `invalid input for ${call.name}: ${parsed.error.message}`, isError: true };
   }
@@ -131,7 +141,9 @@ async function executeTool(
     const decision = await cfg.permissions.evaluate(tool, parsed.data, ctx);
     if (!decision.allow) return { output: `Permission denied: ${decision.reason}`, isError: true };
     const result = await tool.execute(parsed.data, ctx);
-    return { output: normalizeToolOutput(result.content), isError: result.isError ?? false };
+    const output = normalizeToolOutput(result.content);
+    if (cfg.hooks) await cfg.hooks.postToolUse(call.name, parsed.data, output);
+    return { output, isError: result.isError ?? false };
   } catch (err) {
     logger.error("tool execution failed", call.name, err);
     return { output: `tool error: ${err instanceof Error ? err.message : String(err)}`, isError: true };
@@ -151,8 +163,17 @@ export async function* run(
   const logger = cfg.logger ?? noopLogger;
   const cumulative = emptyUsage();
 
+  // UserPromptSubmit hook may rewrite or block the prompt before anything runs.
+  let userText = userInput.text;
+  let blockedReason: string | null = null;
+  if (cfg.hooks) {
+    const decision = await cfg.hooks.userPromptSubmit(userText);
+    if (decision.action === "block") blockedReason = decision.reason ?? "blocked by hook";
+    else if (decision.action === "rewrite" && decision.prompt) userText = decision.prompt;
+  }
+
   const userContent: ContentBlock[] = [];
-  if (userInput.text.length > 0) userContent.push({ type: "text", text: userInput.text });
+  if (userText.length > 0) userContent.push({ type: "text", text: userText });
   for (const img of userInput.images ?? []) {
     userContent.push({ type: "image", mediaType: img.mediaType, data: img.data });
   }
@@ -170,6 +191,13 @@ export async function* run(
     mcp_servers: [],
     max_turns: cfg.maxTurns,
   };
+
+  if (blockedReason !== null) {
+    if (cfg.hooks) await cfg.hooks.fire("Stop");
+    const { event, result } = buildResult(cfg, cumulative, 0, "end_turn", blockedReason);
+    yield event;
+    return result;
+  }
 
   let turnsUsed = 0;
   let lastText = "";
@@ -262,6 +290,7 @@ export async function* run(
         error: aborted ? "interrupted" : message,
         partialText: lastText || undefined,
       });
+      if (cfg.hooks) await cfg.hooks.fire("Stop");
       yield event;
       return result;
     }
@@ -314,6 +343,7 @@ export async function* run(
       yield { type: "message_stop", stop_reason: stop, agent_id: ROOT_AGENT };
       const terminal: TerminalReason = stopReason === "max_tokens" ? "max_tokens" : "end_turn";
       const { event, result } = buildResult(cfg, cumulative, turnsUsed, terminal, turnText || lastText);
+      if (cfg.hooks) await cfg.hooks.fire("Stop");
       yield event;
       return result;
     }
@@ -355,6 +385,7 @@ export async function* run(
     error: `reached the maximum of ${cfg.maxTurns} turns`,
     partialText: lastText || undefined,
   });
+  if (cfg.hooks) await cfg.hooks.fire("Stop");
   yield event;
   return result;
 }

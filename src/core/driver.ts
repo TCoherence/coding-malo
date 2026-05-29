@@ -1,4 +1,6 @@
 import type { ResolvedConfig } from "../config/load";
+import { HookRunner } from "../hooks/runner";
+import { discoverMemory } from "../memory/discover";
 import type { ApprovalStore } from "../permissions/approvals";
 import { PermissionEngine } from "../permissions/engine";
 import { sanitizeEnv } from "../permissions/sandbox";
@@ -35,6 +37,8 @@ export class AgentDriver {
   private readonly permissions: PermissionEngine;
   private readonly provider: Provider;
   private readonly env: Record<string, string>;
+  private readonly hooks: HookRunner;
+  private readonly memory: string;
 
   constructor(private readonly opts: DriverOptions) {
     this.conversation = opts.history ?? [];
@@ -57,6 +61,12 @@ export class AgentDriver {
         ...(opts.config.promptCaching !== undefined ? { promptCaching: opts.config.promptCaching } : {}),
       });
     this.env = sanitizeEnv(opts.config.passthroughEnv, { OMA_AGENT_HOME: ".omcb" });
+    this.hooks = new HookRunner(opts.config.hooks, this.env, opts.workspace);
+    this.memory = discoverMemory(opts.workspace, opts.config.memoryFiles);
+  }
+
+  hookRunner(): HookRunner {
+    return this.hooks;
   }
 
   toolNames(): string[] {
@@ -65,17 +75,19 @@ export class AgentDriver {
 
   runTurn(input: UserInput, signal: AbortSignal): AsyncGenerator<OmcbEvent, FinalResult, void> {
     const c = this.opts.config;
+    const base = buildSystemPrompt({
+      workspace: this.opts.workspace,
+      platform: process.platform,
+      permissionMode: c.permissionMode,
+      sandbox: c.sandbox,
+    });
     return run(
       {
         provider: this.provider,
         registry: this.registry,
         permissions: this.permissions,
-        systemPrompt: buildSystemPrompt({
-          workspace: this.opts.workspace,
-          platform: process.platform,
-          permissionMode: c.permissionMode,
-          sandbox: c.sandbox,
-        }),
+        hooks: this.hooks,
+        systemPrompt: this.memory ? `${base}\n\n${this.memory}` : base,
         appendSystemPrompt: this.opts.appendSystemPrompt,
         maxTurns: c.maxTurns,
         model: c.model,

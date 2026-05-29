@@ -176,7 +176,7 @@ async function main(): Promise<void> {
       : {}),
     ...(values["dangerously-skip-permissions"] ? { dangerouslySkipPermissions: true } : {}),
   };
-  const config = resolveConfig(overrides);
+  const config = resolveConfig(overrides, workspace);
 
   // Resume or start fresh.
   let sessionId: string;
@@ -225,6 +225,7 @@ async function main(): Promise<void> {
   process.once("SIGTERM", onSig);
 
   const images = loadImages(values.image);
+  await driver.hookRunner().fire("SessionStart", { mode: "print" });
   const gen = driver.runTurn({ text: promptText, ...(images ? { images } : {}) }, ac.signal);
   let step = await gen.next();
   while (!step.done) {
@@ -232,6 +233,7 @@ async function main(): Promise<void> {
     step = await gen.next();
   }
   const result = step.value;
+  await driver.hookRunner().fire("SessionEnd", { mode: "print" });
 
   persistMeta({
     sessionId,
