@@ -1,4 +1,6 @@
-# oh-my-coding-buddy (omcb)
+# codingMalo
+
+> 命令为 `omcb`（亦可用 `codingmalo`）。仓库目录与内部标识仍沿用 `omcb` / `~/.omcb`。
 
 A terminal coding agent that talks **directly to model APIs** (Anthropic Messages API today; a
 generic OpenAI-compatible adapter next) — no dependency on any vendor CLI/SDK. It is both an

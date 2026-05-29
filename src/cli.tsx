@@ -19,7 +19,7 @@ import type { PermissionMode, SandboxTier } from "./permissions/types";
 import { runInteractive } from "./ui/runInteractive";
 import { VERSION } from "./version";
 
-const HELP = `omcb — oh-my-coding-buddy
+const HELP = `codingMalo — 直连模型 API 的终端编程 agent（命令 omcb，也可用 codingmalo）
 
 Usage:
   omcb [prompt]                 Start an interactive session (or run a one-shot prompt).

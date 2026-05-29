@@ -40,8 +40,12 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
     ...(opts.appendSystemPrompt ? { appendSystemPrompt: opts.appendSystemPrompt } : {}),
   });
   let logoLines: string[] | undefined;
-  const logoPath = opts.config.logo ?? path.join(omcbHome(), "logo.png");
-  if (fs.existsSync(logoPath)) {
+  const logoPath =
+    opts.config.logo ??
+    ["logo.png", "logo.jpg", "logo.jpeg", "logo.webp"]
+      .map((n) => path.join(omcbHome(), n))
+      .find((p) => fs.existsSync(p));
+  if (logoPath && fs.existsSync(logoPath)) {
     try {
       logoLines = await renderImageHalfBlocks(logoPath, 18);
     } catch {
