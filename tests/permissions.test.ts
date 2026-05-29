@@ -54,6 +54,14 @@ describe("ApprovalStore", () => {
     expect(reloaded.isAllowed("Write", "/w/x")).toBe(true);
     expect(reloaded.isAllowed("Bash", "ls")).toBe(false); // session-only didn't persist
   });
+
+  it("does not collide when a tool name + resource could ambiguously concatenate", () => {
+    const a = new ApprovalStore(false);
+    a.remember("Bash echo", "x", "session");
+    // ("Bash","echo x") must NOT be considered allowed by the ("Bash echo","x") grant.
+    expect(a.isAllowed("Bash", "echo x")).toBe(false);
+    expect(a.isAllowed("Bash echo", "x")).toBe(true);
+  });
 });
 
 describe("PermissionEngine + remembered approvals", () => {
@@ -92,5 +100,10 @@ describe("buildSandboxProfile", () => {
     const p = buildSandboxProfile("read-only", "/ws", "/tmp");
     expect(p).toContain("(deny network*)");
     expect(p).not.toContain('(subpath "/ws")');
+  });
+  it("escapes quotes/backslashes in paths so the profile can't be broken/injected", () => {
+    const p = buildSandboxProfile("workspace-write", '/tmp/w"s\\x', "/tmp");
+    // the embedded quote must be backslash-escaped, never left bare to terminate the literal
+    expect(p).toContain('(subpath "/tmp/w\\"s\\\\x")');
   });
 });

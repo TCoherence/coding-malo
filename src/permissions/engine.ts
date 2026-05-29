@@ -1,5 +1,4 @@
-import path from "node:path";
-
+import { isWithinWorkspace } from "../tools/paths";
 import { matchAllowed } from "../tools/registry";
 import type { Tool, ToolContext } from "../tools/types";
 import type { ApprovalStore } from "./approvals";
@@ -69,9 +68,10 @@ export class PermissionEngine {
       return deny("read-only sandbox: this action would modify state");
     }
 
-    const root = path.resolve(workspace);
-    // Boundary check must respect path separators: "/proj2" must not match workspace "/proj".
-    const inWorkspace = resource === root || resource.startsWith(root + path.sep);
+    // Boundary check is separator- and symlink-aware (a symlink inside the workspace must not
+    // point out of it). Only Write/Edit reach the acceptEdits auto-allow below (onlyReadWrite),
+    // where `resource` is a real file path; execution still re-validates via resolveInsideWorkspace.
+    const inWorkspace = isWithinWorkspace(workspace, resource);
     const onlyReadWrite = effects.every((e) => e === "read" || e === "write");
     if (mode === "acceptEdits" && danger === "low" && inWorkspace && onlyReadWrite) {
       return allow();

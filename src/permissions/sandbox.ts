@@ -38,12 +38,20 @@ export function sanitizeEnv(
  * ("allow default") then confines file writes to the workspace + TMPDIR and gates network by tier.
  * The real boundaries remain env sanitization + cwd confinement; sandbox-exec is deprecated by Apple.
  */
+function escapeProfilePath(s: string): string {
+  // seatbelt string literals are double-quoted; escape backslashes and quotes to prevent
+  // a path like /tmp/work"space from breaking (or escaping) the profile.
+  return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
 export function buildSandboxProfile(tier: SandboxTier, workspace: string, tmpdir: string): string {
+  const ws = escapeProfilePath(workspace);
+  const tmp = escapeProfilePath(tmpdir);
   const devWrites = '(literal "/dev/null") (literal "/dev/stdout") (literal "/dev/stderr") (regex #"^/dev/tty")';
   const writeAllow =
     tier === "read-only"
-      ? `(allow file-write*\n    (subpath "${tmpdir}")\n    ${devWrites})`
-      : `(allow file-write*\n    (subpath "${workspace}")\n    (subpath "${tmpdir}")\n    ${devWrites})`;
+      ? `(allow file-write*\n    (subpath "${tmp}")\n    ${devWrites})`
+      : `(allow file-write*\n    (subpath "${ws}")\n    (subpath "${tmp}")\n    ${devWrites})`;
   const network = tier === "read-only" ? "(deny network*)" : "(allow network*)";
   return [
     "(version 1)",
