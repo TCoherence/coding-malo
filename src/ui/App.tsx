@@ -90,7 +90,9 @@ function toolArgSummary(input: unknown): string {
   return JSON.stringify(i);
 }
 
-const MALO_LOGO = ['  .-"-.  ', " c(o.o)ɔ ", "  >|m|<  "];
+// Block-art monkey head (MALO), drawn with Unicode block elements like Claude Code's logo.
+const MALO_LOGO = [" ▟▀▙ ▟▀▙ ", "▕█▀███▀█▏", "▕███▾███▏", " ▝▜███▛▘ "];
+const LOGO_COLOR = "#e0883c";
 
 function Banner({ model, cwd }: { model: string; cwd: string }): ReactElement {
   return (
@@ -98,7 +100,7 @@ function Banner({ model, cwd }: { model: string; cwd: string }): ReactElement {
       <Box>
         <Box flexDirection="column" marginRight={2}>
           {MALO_LOGO.map((l, i) => (
-            <Text key={i} color="yellow">
+            <Text key={i} color={LOGO_COLOR}>
               {l}
             </Text>
           ))}

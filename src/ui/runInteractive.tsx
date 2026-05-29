@@ -189,19 +189,38 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
 
   await driver.init();
   await driver.hookRunner().fire("SessionStart", { mode: "interactive" });
-  // Take over the terminal: clear screen + scrollback so omcb starts clean from the top.
-  if (process.stdout.isTTY) {
-    const ESC = String.fromCharCode(27);
-    process.stdout.write(`${ESC}[2J${ESC}[3J${ESC}[H`);
-  }
+  // Alternate screen: take over the whole terminal while running, then restore the user's previous
+  // terminal contents on exit (like vim / codex).
+  const ESC = String.fromCharCode(27);
+  const useAlt = Boolean(process.stdout.isTTY);
+  let altActive = false;
+  const enterAlt = (): void => {
+    if (useAlt && !altActive) {
+      process.stdout.write(`${ESC}[?1049h${ESC}[H`);
+      altActive = true;
+    }
+  };
+  const leaveAlt = (): void => {
+    if (altActive) {
+      process.stdout.write(`${ESC}[?1049l`);
+      altActive = false;
+    }
+  };
+  process.once("exit", leaveAlt); // safety net for abnormal exits
+
+  enterAlt();
   const instance = render(
     <App store={store} onSubmit={onSubmit} onInterrupt={onInterrupt} onSelectModel={selectModel} />,
     { exitOnCtrlC: false },
   );
-  await finished;
-  store.cancelPendingApprovals(); // unblock any awaited approval before tearing down
-  store.flush();
-  await driver.hookRunner().fire("SessionEnd", { mode: "interactive" });
-  await driver.close();
-  instance.unmount();
+  try {
+    await finished;
+  } finally {
+    store.cancelPendingApprovals(); // unblock any awaited approval before tearing down
+    store.flush();
+    instance.unmount();
+    await driver.hookRunner().fire("SessionEnd", { mode: "interactive" });
+    await driver.close();
+    leaveAlt();
+  }
 }
