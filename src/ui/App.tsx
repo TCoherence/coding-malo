@@ -94,16 +94,21 @@ function toolArgSummary(input: unknown): string {
 const MALO_LOGO = [" ▟▀▙ ▟▀▙ ", "▕█▀███▀█▏", "▕███▾███▏", " ▝▜███▛▘ "];
 const LOGO_COLOR = "#e0883c";
 
-function Banner({ model, cwd }: { model: string; cwd: string }): ReactElement {
+function Banner({ model, cwd, logoLines }: { model: string; cwd: string; logoLines?: string[] }): ReactElement {
+  const useImg = Boolean(logoLines && logoLines.length > 0);
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1} marginBottom={1}>
       <Box>
         <Box flexDirection="column" marginRight={2}>
-          {MALO_LOGO.map((l, i) => (
-            <Text key={i} color={LOGO_COLOR}>
-              {l}
-            </Text>
-          ))}
+          {(useImg ? (logoLines as string[]) : MALO_LOGO).map((l, i) =>
+            useImg ? (
+              <Text key={i}>{l}</Text>
+            ) : (
+              <Text key={i} color={LOGO_COLOR}>
+                {l}
+              </Text>
+            ),
+          )}
         </Box>
         <Box flexDirection="column">
           <Text color="cyan" bold>
@@ -126,7 +131,7 @@ function Banner({ model, cwd }: { model: string; cwd: string }): ReactElement {
 function TranscriptLine({ item }: { item: TranscriptItem }): ReactElement {
   switch (item.kind) {
     case "banner":
-      return <Banner model={item.model} cwd={item.cwd} />;
+      return <Banner model={item.model} cwd={item.cwd} {...(item.logoLines ? { logoLines: item.logoLines } : {})} />;
     case "user":
       return (
         <Box marginTop={1}>

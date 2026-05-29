@@ -1,6 +1,10 @@
+import fs from "node:fs";
+import path from "node:path";
+
 import { render } from "ink";
 
 import type { ResolvedConfig } from "../config/load";
+import { omcbHome } from "../core/paths";
 import { AgentDriver } from "../core/driver";
 import { OmcbError } from "../core/errors";
 import { writeMeta } from "../core/meta";
@@ -11,6 +15,7 @@ import { expandCommand, loadCommands } from "../commands/loader";
 import { ApprovalStore } from "../permissions/approvals";
 import { TuiPrompter } from "../permissions/tui-prompter";
 import { App } from "./App";
+import { renderImageHalfBlocks } from "./image";
 
 export interface InteractiveOptions {
   config: ResolvedConfig;
@@ -34,7 +39,16 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
     ...(opts.history ? { history: opts.history } : {}),
     ...(opts.appendSystemPrompt ? { appendSystemPrompt: opts.appendSystemPrompt } : {}),
   });
-  store.addBanner(driver.getModel(), opts.workspace);
+  let logoLines: string[] | undefined;
+  const logoPath = opts.config.logo ?? path.join(omcbHome(), "logo.png");
+  if (fs.existsSync(logoPath)) {
+    try {
+      logoLines = await renderImageHalfBlocks(logoPath, 18);
+    } catch {
+      logoLines = undefined; // fall back to the block-art monkey
+    }
+  }
+  store.addBanner(driver.getModel(), opts.workspace, logoLines);
 
   let busy = false;
   let currentAbort: AbortController | null = null;

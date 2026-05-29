@@ -44,6 +44,10 @@ or `--model <name>` (headless): this swaps the whole provider + endpoint + key +
 **Interactive commands:** `/model [name]`, `/help`, `/clear`, `/cost`, `/quit`, plus markdown commands in
 `.omcb/commands/`. `↑/↓` recall history. Tool calls render as live cards; the header shows the model.
 
+**Banner logo.** Drop a PNG/JPG at `~/.omcb/logo.png` (or set `"logo": "/abs/path.png"` in config.json)
+and it renders in the welcome banner as half-block truecolor — works in any 24-bit terminal. With no
+image, a built-in block-art monkey is shown. A square-ish small image looks best.
+
 ## Headless protocol (NDJSON)
 
 Events: `init`, `message_start`, `thinking_delta`, `text_delta`, `tool_start`, `tool_result`,

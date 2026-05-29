@@ -35,6 +35,8 @@ export interface ResolvedConfig {
   mcpServers: McpServerConfig[];
   /** Named model profiles, keyed by name; switch the active one with /model or --model. */
   modelProfiles: Record<string, ResolvedModelProfile>;
+  /** Optional banner logo image path. */
+  logo?: string;
 }
 
 export interface ConfigOverrides {
@@ -191,5 +193,6 @@ export function resolveConfig(overrides: ConfigOverrides, workspace?: string): R
     memoryFiles: file.memory?.files ?? ["AGENTS.md", "CLAUDE.md"],
     mcpServers: file.mcpServers ?? [],
     modelProfiles,
+    ...(file.logo ? { logo: file.logo } : {}),
   };
 }

@@ -49,6 +49,8 @@ export const OmcbConfigSchema = z
   .object({
     /** Free-form comment key (JSON has no comments); ignored. */
     "//": z.string().optional(),
+    /** Path to a banner logo image (PNG/JPG); rendered as half-block text. Default ~/.omcb/logo.png. */
+    logo: z.string().optional(),
     /** Active model: a profile name from `models`, or a raw wire model id. */
     defaultModel: z.string().optional(),
     /** Named model profiles, switchable with /model. e.g. { "deepseek": { provider, model, … } }. */
