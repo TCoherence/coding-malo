@@ -24,6 +24,7 @@ function ctx(): ToolContext {
     cwd: workspace,
     signal: new AbortController().signal,
     env: sanitizeEnv(),
+    sandbox: "workspace-write",
     emitChunk: () => {},
     requestApproval: async () => ({ allow: false, reason: "denied in test" }),
     agentId: "root",

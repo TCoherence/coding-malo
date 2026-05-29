@@ -3,6 +3,7 @@ import { useState, useSyncExternalStore } from "react";
 import type { ReactElement } from "react";
 
 import type { Store, StoreState, ToolCard, TranscriptItem } from "../core/store";
+import type { ApprovalRequest } from "../permissions/types";
 
 function truncate(s: string, max: number): string {
   const oneLine = s.replace(/\s+/g, " ").trim();
@@ -72,6 +73,26 @@ function Footer({ state }: { state: StoreState }): ReactElement {
   );
 }
 
+function ApprovalModal({ req }: { req: ApprovalRequest }): ReactElement {
+  return (
+    <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={1} marginTop={1}>
+      <Text color="yellow">
+        Approval required: <Text bold>{req.toolName}</Text>{" "}
+        <Text dimColor>
+          ({req.effects.join(",")}, {req.danger})
+        </Text>
+      </Text>
+      <Text dimColor>{truncate(req.resource, 100)}</Text>
+      <Text>
+        <Text color="green">[a]</Text> allow once {"  "}
+        <Text color="green">[s]</Text> allow session {"  "}
+        <Text color="green">[p]</Text> allow + remember {"  "}
+        <Text color="red">[d]</Text> deny
+      </Text>
+    </Box>
+  );
+}
+
 function Prompt({ onSubmit }: { onSubmit: (text: string) => void }): ReactElement {
   const [value, setValue] = useState("");
   useInput((input, key) => {
@@ -111,8 +132,19 @@ export function App({
 }): ReactElement {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot);
 
+  const pendingApproval = state.approvalQueue[0];
+
   useInput((input, key) => {
-    if (key.ctrl && (input === "c" || input === "d")) onInterrupt();
+    if (key.ctrl && input === "c") {
+      onInterrupt();
+      return;
+    }
+    if (pendingApproval) {
+      if (input === "a") store.resolveApproval({ allow: true });
+      else if (input === "s") store.resolveApproval({ allow: true, remember: "session" });
+      else if (input === "p") store.resolveApproval({ allow: true, remember: "persist" });
+      else if (input === "d" || key.escape) store.resolveApproval({ allow: false, reason: "denied by user" });
+    }
   });
 
   return (
@@ -125,7 +157,9 @@ export function App({
         <RunningTool key={t.id} tool={t} />
       ))}
       <Footer state={state} />
-      {state.busy ? (
+      {pendingApproval ? (
+        <ApprovalModal req={pendingApproval} />
+      ) : state.busy ? (
         <Text dimColor>… working (Ctrl+C to interrupt)</Text>
       ) : (
         <Prompt onSubmit={onSubmit} />

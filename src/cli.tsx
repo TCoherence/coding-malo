@@ -156,11 +156,20 @@ async function main(): Promise<void> {
 
   const workspace = path.resolve(values.workspace ?? process.cwd());
 
+  const mode = detectMode({ print: Boolean(values.print), stdinIsTty: Boolean(process.stdin.isTTY) });
+
+  // Permission default: explicit flag wins; otherwise interactive sessions default to acceptEdits
+  // (with the approval modal handling escalations), while headless stays unattended (bypass).
+  let permMode = values["permission-mode"] as PermissionMode | undefined;
+  if (!permMode && !values["dangerously-skip-permissions"] && mode === "interactive") {
+    permMode = "acceptEdits";
+  }
+
   const overrides: ConfigOverrides = {
     ...(values.provider ? { provider: values.provider as "anthropic" | "openai-compat" } : {}),
     ...(values.model ? { model: values.model } : {}),
     ...(values["max-turns"] ? { maxTurns: Number(values["max-turns"]) } : {}),
-    ...(values["permission-mode"] ? { permissionMode: values["permission-mode"] as PermissionMode } : {}),
+    ...(permMode ? { permissionMode: permMode } : {}),
     ...(values.sandbox ? { sandbox: values.sandbox as SandboxTier } : {}),
     ...(values["allowed-tools"]
       ? { allowedTools: values["allowed-tools"].split(",").map((s) => s.trim()).filter(Boolean) }
@@ -182,25 +191,30 @@ async function main(): Promise<void> {
   }
 
   const writer = new SessionWriter(sessionId);
-  const prompter = new HeadlessPrompter(config.permissionMode);
+
+  if (mode === "interactive") {
+    await runInteractive({
+      config,
+      sessionId,
+      workspace,
+      writer,
+      history,
+      ...(values["append-system-prompt"] ? { appendSystemPrompt: values["append-system-prompt"] } : {}),
+    });
+    return;
+  }
+
+  // Headless print mode — non-interactive prompter (auto-denies gated actions).
   const driver = new AgentDriver({
     config,
     sessionId,
     workspace,
-    prompter,
+    prompter: new HeadlessPrompter(config.permissionMode),
     writer,
     history,
     ...(values["append-system-prompt"] ? { appendSystemPrompt: values["append-system-prompt"] } : {}),
   });
 
-  const mode = detectMode({ print: Boolean(values.print), stdinIsTty: Boolean(process.stdin.isTTY) });
-
-  if (mode === "interactive") {
-    await runInteractive({ driver, sessionId, workspace, config });
-    return;
-  }
-
-  // Headless print mode.
   const promptText = positionals.join(" ").trim() || (await readStdin());
   const format = (values["output-format"] as OutputFormat) ?? "stream-json";
   const renderer = new JsonRenderer(process.stdout, process.stderr, format);

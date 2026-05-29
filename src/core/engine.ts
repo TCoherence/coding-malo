@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { PermissionEngine } from "../permissions/engine";
+import type { SandboxTier } from "../permissions/types";
 import type { Provider } from "../providers/provider";
 import type { ToolRegistry } from "../tools/registry";
 import type { Logger, ToolContext, ToolResultBlock } from "../tools/types";
@@ -48,6 +49,7 @@ export interface AgentLoopConfig {
   sessionId: string;
   workspace: string;
   env: Record<string, string>;
+  sandbox: SandboxTier;
   allowedTools?: string[];
   writer?: { writeMessage(m: NormalizedMessage): void };
   logger?: Logger;
@@ -114,6 +116,7 @@ async function executeTool(
     cwd: cfg.workspace,
     signal: cfg.signal,
     env: cfg.env,
+    sandbox: cfg.sandbox,
     emitChunk: () => {}, // M0: live tool output is not yet forwarded to the protocol
     requestApproval: (req) => cfg.permissions.prompter.prompt(req),
     agentId: ROOT_AGENT,

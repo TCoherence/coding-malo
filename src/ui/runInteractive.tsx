@@ -1,22 +1,39 @@
 import { render } from "ink";
 
 import type { ResolvedConfig } from "../config/load";
-import type { AgentDriver } from "../core/driver";
+import { AgentDriver } from "../core/driver";
 import { OmcbError } from "../core/errors";
 import { writeMeta } from "../core/meta";
 import type { SessionMeta } from "../core/meta";
 import { Store } from "../core/store";
+import type { NormalizedMessage } from "../core/types";
+import { ApprovalStore } from "../permissions/approvals";
+import { TuiPrompter } from "../permissions/tui-prompter";
 import { App } from "./App";
 
 export interface InteractiveOptions {
-  driver: AgentDriver;
+  config: ResolvedConfig;
   sessionId: string;
   workspace: string;
-  config: ResolvedConfig;
+  writer?: { writeMessage(m: NormalizedMessage): void };
+  history?: NormalizedMessage[];
+  appendSystemPrompt?: string;
 }
 
 export async function runInteractive(opts: InteractiveOptions): Promise<void> {
   const store = new Store();
+  const prompter = new TuiPrompter((req) => store.requestApproval(req));
+  const driver = new AgentDriver({
+    config: opts.config,
+    sessionId: opts.sessionId,
+    workspace: opts.workspace,
+    prompter,
+    approvals: new ApprovalStore(),
+    ...(opts.writer ? { writer: opts.writer } : {}),
+    ...(opts.history ? { history: opts.history } : {}),
+    ...(opts.appendSystemPrompt ? { appendSystemPrompt: opts.appendSystemPrompt } : {}),
+  });
+
   let busy = false;
   let currentAbort: AbortController | null = null;
   let totalTurns = 0;
@@ -37,7 +54,7 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
       provider: opts.config.providerKind,
       model: opts.config.model,
       workspace: opts.workspace,
-      allowedTools: opts.driver.toolNames(),
+      allowedTools: driver.toolNames(),
       maxTurns: opts.config.maxTurns,
       turnsUsed: totalTurns,
       status,
@@ -53,7 +70,7 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
     const ac = new AbortController();
     currentAbort = ac;
     try {
-      const gen = opts.driver.runTurn({ text }, ac.signal);
+      const gen = driver.runTurn({ text }, ac.signal);
       let step = await gen.next();
       while (!step.done) {
         store.apply(step.value);

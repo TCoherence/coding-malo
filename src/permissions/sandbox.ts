@@ -1,3 +1,5 @@
+import type { SandboxTier } from "./types";
+
 /**
  * Env sanitization — the real boundary in M0 (full sandbox-exec arrives in M2). Mirrors
  * oh-my-agent's whitelist exactly. Model API keys are intentionally NOT forwarded to tool
@@ -29,4 +31,46 @@ export function sanitizeEnv(
   }
   Object.assign(out, extra);
   return out;
+}
+
+/**
+ * Generate a macOS seatbelt (sandbox-exec) profile. Best-effort defense-in-depth: starts permissive
+ * ("allow default") then confines file writes to the workspace + TMPDIR and gates network by tier.
+ * The real boundaries remain env sanitization + cwd confinement; sandbox-exec is deprecated by Apple.
+ */
+export function buildSandboxProfile(tier: SandboxTier, workspace: string, tmpdir: string): string {
+  const devWrites = '(literal "/dev/null") (literal "/dev/stdout") (literal "/dev/stderr") (regex #"^/dev/tty")';
+  const writeAllow =
+    tier === "read-only"
+      ? `(allow file-write*\n    (subpath "${tmpdir}")\n    ${devWrites})`
+      : `(allow file-write*\n    (subpath "${workspace}")\n    (subpath "${tmpdir}")\n    ${devWrites})`;
+  const network = tier === "read-only" ? "(deny network*)" : "(allow network*)";
+  return [
+    "(version 1)",
+    "(allow default)",
+    "(deny file-write*)",
+    writeAllow,
+    network,
+  ].join("\n");
+}
+
+export interface BashInvocation {
+  file: string;
+  args: string[];
+}
+
+/**
+ * Decide how to spawn a bash command. With OMCB_SANDBOX_EXEC=1 on macOS (and a non-danger tier),
+ * wrap it in sandbox-exec; otherwise run bash directly. Opt-in so the default path is unchanged.
+ */
+export function bashInvocation(
+  command: string,
+  opts: { tier: SandboxTier; workspace: string },
+): BashInvocation {
+  const enabled = process.env.OMCB_SANDBOX_EXEC === "1";
+  if (enabled && process.platform === "darwin" && opts.tier !== "danger-full-access") {
+    const profile = buildSandboxProfile(opts.tier, opts.workspace, process.env.TMPDIR ?? "/tmp");
+    return { file: "sandbox-exec", args: ["-p", profile, "bash", "-c", command] };
+  }
+  return { file: "bash", args: ["-c", command] };
 }

@@ -33,6 +33,7 @@ export function makeConfig(
     sessionId: "sess_test",
     workspace,
     env: sanitizeEnv([], { OMA_AGENT_HOME: ".omcb" }),
+    sandbox: "workspace-write",
     ...overrides,
   };
 }

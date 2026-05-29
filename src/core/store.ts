@@ -1,3 +1,4 @@
+import type { ApprovalRequest, Decision } from "../permissions/types";
 import type { OmcbEvent } from "./events";
 
 export interface ToolCard {
@@ -28,6 +29,8 @@ export interface StoreState {
   usage: UsageTotals;
   busy: boolean;
   status: "idle" | "streaming" | "error";
+  /** Front of this queue is rendered as an approval modal; resolved via resolveApproval(). */
+  approvalQueue: ApprovalRequest[];
 }
 
 function initialState(): StoreState {
@@ -39,12 +42,19 @@ function initialState(): StoreState {
     usage: { input: 0, output: 0, cacheRead: 0, cost: 0 },
     busy: false,
     status: "idle",
+    approvalQueue: [],
   };
+}
+
+interface PendingApproval {
+  req: ApprovalRequest;
+  resolve: (d: Decision) => void;
 }
 
 export class Store {
   private state: StoreState = initialState();
   private readonly listeners = new Set<() => void>();
+  private readonly approvals: PendingApproval[] = [];
 
   getSnapshot = (): StoreState => this.state;
 
@@ -60,6 +70,20 @@ export class Store {
 
   addUser(text: string): void {
     this.set((s) => ({ ...s, transcript: [...s.transcript, { kind: "user", text }] }));
+  }
+
+  /** Called by the TuiPrompter: enqueue an approval request and resolve when the user decides. */
+  requestApproval(req: ApprovalRequest): Promise<Decision> {
+    return new Promise<Decision>((resolve) => {
+      this.approvals.push({ req, resolve });
+      this.set((s) => ({ ...s, approvalQueue: this.approvals.map((a) => a.req) }));
+    });
+  }
+
+  resolveApproval(decision: Decision): void {
+    const head = this.approvals.shift();
+    this.set((s) => ({ ...s, approvalQueue: this.approvals.map((a) => a.req) }));
+    head?.resolve(decision);
   }
 
   setBusy(busy: boolean): void {

@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 
 import { z } from "zod";
 
+import { bashInvocation } from "../../permissions/sandbox";
 import type { Tool, ToolResult } from "../types";
 
 const OUTPUT_CAP = 200 * 1024; // 200KB
@@ -26,8 +27,9 @@ export const bashTool: Tool<Input> = {
   },
   execute(input, ctx) {
     const timeoutMs = input.timeout ?? DEFAULT_TIMEOUT_MS;
+    const { file, args } = bashInvocation(input.command, { tier: ctx.sandbox, workspace: ctx.cwd });
     return new Promise<ToolResult>((resolve) => {
-      const child = spawn("bash", ["-c", input.command], {
+      const child = spawn(file, args, {
         cwd: ctx.cwd,
         env: ctx.env,
       });

@@ -1,7 +1,7 @@
 import type { ZodType } from "zod";
 
 import type { ToolSource } from "../core/types";
-import type { ApprovalRequest, Decision, PermissionEffect } from "../permissions/types";
+import type { ApprovalRequest, Decision, PermissionEffect, SandboxTier } from "../permissions/types";
 
 export interface Logger {
   debug(...args: unknown[]): void;
@@ -14,6 +14,7 @@ export interface ToolContext {
   cwd: string;
   signal: AbortSignal;
   env: Record<string, string>;
+  sandbox: SandboxTier;
   /** Live output (e.g. streaming bash stdout). Renderers may show it; safe to ignore. */
   emitChunk(chunk: string): void;
   requestApproval(req: ApprovalRequest): Promise<Decision>;

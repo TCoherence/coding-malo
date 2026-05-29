@@ -1,4 +1,5 @@
 import type { ResolvedConfig } from "../config/load";
+import type { ApprovalStore } from "../permissions/approvals";
 import { PermissionEngine } from "../permissions/engine";
 import { sanitizeEnv } from "../permissions/sandbox";
 import type { Prompter } from "../permissions/types";
@@ -16,6 +17,7 @@ export interface DriverOptions {
   sessionId: string;
   workspace: string;
   prompter: Prompter;
+  approvals?: ApprovalStore;
   appendSystemPrompt?: string;
   writer?: { writeMessage(m: NormalizedMessage): void };
   history?: NormalizedMessage[];
@@ -44,6 +46,7 @@ export class AgentDriver {
       allowedTools: opts.config.allowedTools,
       prompter: opts.prompter,
       workspace: opts.workspace,
+      ...(opts.approvals ? { approvals: opts.approvals } : {}),
     });
     this.provider =
       opts.provider ??
@@ -82,6 +85,7 @@ export class AgentDriver {
         sessionId: this.opts.sessionId,
         workspace: this.opts.workspace,
         env: this.env,
+        sandbox: c.sandbox,
         allowedTools: c.allowedTools,
         writer: this.opts.writer,
       },

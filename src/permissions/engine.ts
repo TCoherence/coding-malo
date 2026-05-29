@@ -2,6 +2,7 @@ import path from "node:path";
 
 import { matchAllowed } from "../tools/registry";
 import type { Tool, ToolContext } from "../tools/types";
+import type { ApprovalStore } from "./approvals";
 import { allow, deny } from "./types";
 import type { Decision, PermissionMode, Prompter, SandboxTier } from "./types";
 
@@ -30,6 +31,7 @@ export interface PermissionEngineOptions {
   allowedTools?: string[];
   prompter: Prompter;
   workspace: string;
+  approvals?: ApprovalStore;
 }
 
 export class PermissionEngine {
@@ -75,7 +77,9 @@ export class PermissionEngine {
       return allow();
     }
 
-    return this.opts.prompter.prompt({
+    if (this.opts.approvals?.isAllowed(tool.name, resource)) return allow();
+
+    const decision = await this.opts.prompter.prompt({
       toolName: tool.name,
       resource,
       effects,
@@ -83,5 +87,9 @@ export class PermissionEngine {
       input,
       agentId: ctx.agentId,
     });
+    if (decision.allow && decision.remember && this.opts.approvals) {
+      this.opts.approvals.remember(tool.name, resource, decision.remember);
+    }
+    return decision;
   }
 }

@@ -45,6 +45,7 @@ describe("review fix: workspace boundary respects path separators", () => {
     cwd: "/tmp/proj",
     signal: new AbortController().signal,
     env: sanitizeEnv(),
+    sandbox: "workspace-write",
     emitChunk: () => {},
     requestApproval: async () => ({ allow: false, reason: "x" }),
     agentId: "root",

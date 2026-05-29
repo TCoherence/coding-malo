@@ -40,4 +40,26 @@ describe("TUI App", () => {
     expect(frame).toContain("file_a.txt");
     expect(frame).toContain("anthropic/claude-sonnet-4-6");
   });
+
+  it("shows an approval modal and resolves the request on keypress", async () => {
+    const store = new Store();
+    const { lastFrame, stdin } = render(<App store={store} onSubmit={() => {}} onInterrupt={() => {}} />);
+    const decision = store.requestApproval({
+      toolName: "Bash",
+      resource: "rm -rf /tmp/x",
+      effects: ["execute"],
+      danger: "high",
+      input: {},
+      agentId: "root",
+    });
+    await tick();
+    expect(lastFrame() ?? "").toContain("Approval required");
+    expect(lastFrame() ?? "").toContain("Bash");
+
+    stdin.write("s"); // allow for session
+    const result = await decision;
+    expect(result).toEqual({ allow: true, remember: "session" });
+    await tick();
+    expect(lastFrame() ?? "").not.toContain("Approval required");
+  });
 });
