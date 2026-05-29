@@ -45,15 +45,16 @@ function stripFrontmatter(raw: string): string {
 }
 
 /**
- * Discover skills from ~/.omcb/skills, <ws>/.omcb/skills (== $OMA_AGENT_HOME/skills), and
- * <ws>/.claude/skills (compat). Each skill is a folder with a SKILL.md. Later roots override
- * earlier ones on name collision.
+ * Discover skills from ~/.codingmalo/skills, <ws>/.codingmalo/skills (== $OMA_AGENT_HOME/skills),
+ * plus legacy <ws>/.omcb/skills and <ws>/.claude/skills (compat). Each skill is a folder with a
+ * SKILL.md. Later roots override earlier ones on name collision (so .codingmalo wins).
  */
 export function discoverSkills(workspace: string): LoadedSkill[] {
   const roots = [
     path.join(omcbHome(), "skills"),
     path.join(path.resolve(workspace), ".omcb", "skills"),
     path.join(path.resolve(workspace), ".claude", "skills"),
+    path.join(path.resolve(workspace), ".codingmalo", "skills"),
   ];
   const map = new Map<string, LoadedSkill>();
   for (const root of roots) {

@@ -69,7 +69,7 @@ export class AgentDriver {
         baseUrl: opts.config.baseUrl,
         ...(opts.config.promptCaching !== undefined ? { promptCaching: opts.config.promptCaching } : {}),
       });
-    this.env = sanitizeEnv(opts.config.passthroughEnv, { OMA_AGENT_HOME: ".omcb" });
+    this.env = sanitizeEnv(opts.config.passthroughEnv, { OMA_AGENT_HOME: ".codingmalo" });
     this.hooks = new HookRunner(opts.config.hooks, this.env, opts.workspace);
     this.memory = discoverMemory(opts.workspace, opts.config.memoryFiles);
 

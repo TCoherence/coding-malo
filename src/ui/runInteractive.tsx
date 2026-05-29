@@ -16,6 +16,7 @@ import { ApprovalStore } from "../permissions/approvals";
 import { TuiPrompter } from "../permissions/tui-prompter";
 import { App } from "./App";
 import { renderImageHalfBlocks } from "./image";
+import { runSplash } from "./Splash";
 
 export interface InteractiveOptions {
   config: ResolvedConfig;
@@ -39,6 +40,8 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
     ...(opts.history ? { history: opts.history } : {}),
     ...(opts.appendSystemPrompt ? { appendSystemPrompt: opts.appendSystemPrompt } : {}),
   });
+  const logoWidth = opts.config.logoWidth;
+  const bgThreshold = opts.config.logoBg === "transparent" ? 235 : 0;
   let logoLines: string[] | undefined;
   const logoPath =
     opts.config.logo ??
@@ -47,7 +50,7 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
       .find((p) => fs.existsSync(p));
   if (logoPath && fs.existsSync(logoPath)) {
     try {
-      logoLines = await renderImageHalfBlocks(logoPath, 18);
+      logoLines = await renderImageHalfBlocks(logoPath, { maxCols: logoWidth, bgThreshold });
     } catch {
       logoLines = undefined; // fall back to the block-art monkey
     }
@@ -227,6 +230,17 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
   process.once("exit", leaveAlt); // safety net for abnormal exits
 
   enterAlt();
+  // Flashy startup splash: a larger, higher-detail logo revealed with a quick animation, then the
+  // app mounts. Only when we have a logo image, on a TTY, and not disabled via config/CODINGMALO_SPLASH.
+  if (logoPath && opts.config.splash && useAlt) {
+    try {
+      const cols = Math.max(20, Math.min((process.stdout.columns ?? 80) - 4, 60));
+      const big = await renderImageHalfBlocks(logoPath, { maxCols: cols, bgThreshold });
+      await runSplash(big);
+    } catch {
+      // ignore splash failures and fall through to the app
+    }
+  }
   const instance = render(
     <App store={store} onSubmit={onSubmit} onInterrupt={onInterrupt} onSelectModel={selectModel} />,
     { exitOnCtrlC: false },

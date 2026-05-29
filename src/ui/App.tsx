@@ -90,8 +90,8 @@ function toolArgSummary(input: unknown): string {
   return JSON.stringify(i);
 }
 
-// Fallback block-art monkey head (codingMalo), drawn with Unicode block elements, used when no
-// logo image is present. With ~/.omcb/logo.{png,jpg,jpeg} the banner shows that image instead.
+// Fallback block-art monkey head (Coding Malo), drawn with Unicode block elements, used when no
+// logo image is present. With ~/.codingmalo/logo.{png,jpg,jpeg} the banner shows that image instead.
 const MALO_LOGO = [" ▟▀▙ ▟▀▙ ", "▕█▀███▀█▏", "▕███▾███▏", " ▝▜███▛▘ "];
 const LOGO_COLOR = "#e0883c";
 
@@ -113,7 +113,7 @@ function Banner({ model, cwd, logoLines }: { model: string; cwd: string; logoLin
         </Box>
         <Box flexDirection="column">
           <Text color="cyan" bold>
-            codingMalo <Text dimColor>v{VERSION}</Text>
+            Coding Malo <Text dimColor>v{VERSION}</Text>
           </Text>
           <Text dimColor>🐒 一只爱写代码的猴子</Text>
         </Box>
@@ -219,7 +219,7 @@ function Footer({ state }: { state: StoreState }): ReactElement {
   return (
     <Box marginTop={1}>
       <Text dimColor>
-        {h ? `${h.provider}/${h.model}` : "codingMalo"} · ↑{u.input} ↓{u.output}
+        {h ? `${h.provider}/${h.model}` : "Coding Malo"} · ↑{u.input} ↓{u.output}
         {u.cacheRead > 0 ? ` · cache ${u.cacheRead}` : ""} · ${u.cost.toFixed(4)}
         {state.status === "error" ? " · error" : ""}
       </Text>

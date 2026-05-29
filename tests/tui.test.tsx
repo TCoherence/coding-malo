@@ -119,13 +119,13 @@ describe("TUI App", () => {
     expect(lastFrame() ?? "").toContain("hello world");
   });
 
-  it("welcome banner shows the codingMalo logo, model and version", async () => {
+  it("welcome banner shows the Coding Malo logo, model and version", async () => {
     const store = new Store();
     const { lastFrame } = render(<App store={store} onSubmit={() => {}} onInterrupt={() => {}} />);
     store.addBanner("deepseek-v4-flash", "/tmp/ws");
     await tick();
     const f = lastFrame() ?? "";
-    expect(f).toContain("codingMalo");
+    expect(f).toContain("Coding Malo");
     expect(f).toContain(`v${VERSION}`);
     expect(f).toContain("deepseek-v4-flash");
   });

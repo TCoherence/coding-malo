@@ -37,6 +37,12 @@ export interface ResolvedConfig {
   modelProfiles: Record<string, ResolvedModelProfile>;
   /** Optional banner logo image path. */
   logo?: string;
+  /** Banner logo width in terminal columns (half-block render). */
+  logoWidth: number;
+  /** Whether to drop a white-ish logo background to transparent, or keep it. */
+  logoBg: "transparent" | "keep";
+  /** Whether to play the animated startup splash (interactive TTY only). */
+  splash: boolean;
 }
 
 export interface ConfigOverrides {
@@ -106,7 +112,7 @@ function readConfigFile(p: string): OmcbConfig | undefined {
   return result.data;
 }
 
-/** Collect config files low→high precedence: global, global.local, then project .omcb (far→near). */
+/** Collect config files low→high precedence: global, global.local, then project .omcb/.codingmalo (far→near). */
 function configFilePaths(workspace: string): string[] {
   const home = omcbHome();
   const paths = [path.join(home, "config.json"), path.join(home, "config.local.json")];
@@ -114,16 +120,21 @@ function configFilePaths(workspace: string): string[] {
   let dir = path.resolve(workspace);
   const stop = os.homedir();
   for (;;) {
-    if (dir === stop) break; // home's .omcb/config.json is the global config, already added above
+    if (dir === stop) break; // home's config.json is the global config, already added above
     projectDirs.push(dir);
     if (fs.existsSync(path.join(dir, ".git"))) break;
     const parent = path.dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
-  // nearest (workspace) should win → append far→near
+  // nearest (workspace) should win → append far→near. Within a dir, .codingmalo overrides legacy .omcb.
   for (const d of projectDirs.reverse()) {
-    paths.push(path.join(d, ".omcb", "config.json"), path.join(d, ".omcb", "config.local.json"));
+    paths.push(
+      path.join(d, ".omcb", "config.json"),
+      path.join(d, ".omcb", "config.local.json"),
+      path.join(d, ".codingmalo", "config.json"),
+      path.join(d, ".codingmalo", "config.local.json"),
+    );
   }
   return paths;
 }
@@ -142,11 +153,15 @@ export function resolveConfig(overrides: ConfigOverrides, workspace?: string): R
 
   const topProvider: "anthropic" | "openai-compat" =
     overrides.provider ??
-    (process.env.OMCB_PROVIDER as "anthropic" | "openai-compat" | undefined) ??
+    (process.env.CODINGMALO_PROVIDER as "anthropic" | "openai-compat" | undefined) ??
     file.provider ??
     "anthropic";
   const topBaseUrl =
-    overrides.baseUrl ?? process.env.OMCB_BASE_URL ?? process.env.ANTHROPIC_BASE_URL ?? file.baseUrl;
+    overrides.baseUrl ??
+    process.env.CODINGMALO_BASE_URL ??
+    process.env.ANTHROPIC_BASE_URL ??
+    process.env.OPENAI_BASE_URL ??
+    file.baseUrl;
   const envApiKey = process.env.ANTHROPIC_API_KEY ?? process.env.OPENAI_API_KEY;
 
   // Named model profiles (their ${env:} secrets were already interpolated by the loader).
@@ -163,36 +178,39 @@ export function resolveConfig(overrides: ConfigOverrides, workspace?: string): R
   }
 
   // The active model: a profile name (→ use its provider/key/baseUrl) or a raw wire id on top-level.
-  const requested = overrides.model ?? process.env.OMCB_MODEL ?? file.defaultModel ?? DEFAULT_MODEL;
+  const requested = overrides.model ?? process.env.CODINGMALO_MODEL ?? file.defaultModel ?? DEFAULT_MODEL;
   const active = modelProfiles[requested];
 
   const permissionMode: PermissionMode = overrides.dangerouslySkipPermissions
     ? "bypass"
     : (overrides.permissionMode ?? file.permissionMode ?? "bypass");
-  const promptCaching = overrides.promptCaching ?? envBool("OMCB_PROMPT_CACHING") ?? file.promptCaching;
+  const promptCaching = overrides.promptCaching ?? envBool("CODINGMALO_PROMPT_CACHING") ?? file.promptCaching;
 
   return {
     providerKind: active ? active.providerKind : topProvider,
     model: active ? active.model : requested,
     apiKey: active ? active.apiKey : envApiKey,
     baseUrl: active ? active.baseUrl : topBaseUrl,
-    maxTurns: overrides.maxTurns ?? Number(process.env.OMCB_MAX_TURNS ?? file.maxTurns ?? 25),
-    maxTokens: overrides.maxTokens ?? active?.maxTokens ?? Number(process.env.OMCB_MAX_TOKENS ?? file.maxTokens ?? 8192),
+    maxTurns: overrides.maxTurns ?? Number(process.env.CODINGMALO_MAX_TURNS ?? file.maxTurns ?? 25),
+    maxTokens: overrides.maxTokens ?? active?.maxTokens ?? Number(process.env.CODINGMALO_MAX_TOKENS ?? file.maxTokens ?? 8192),
     permissionMode,
     sandbox: overrides.sandbox ?? file.sandbox ?? "workspace-write",
     allowedTools: overrides.allowedTools ?? file.allowedTools,
     passthroughEnv:
       file.passthroughEnv ??
-      (process.env.OMCB_PASSTHROUGH_ENV ?? "")
+      (process.env.CODINGMALO_PASSTHROUGH_ENV ?? "")
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean),
-    parallelToolCalls: overrides.parallelToolCalls ?? envBool("OMCB_PARALLEL_TOOL_CALLS") ?? file.parallelToolCalls ?? true,
+    parallelToolCalls: overrides.parallelToolCalls ?? envBool("CODINGMALO_PARALLEL_TOOL_CALLS") ?? file.parallelToolCalls ?? true,
     ...(promptCaching !== undefined ? { promptCaching } : {}),
     hooks: file.hooks ?? [],
     memoryFiles: file.memory?.files ?? ["AGENTS.md", "CLAUDE.md"],
     mcpServers: file.mcpServers ?? [],
     modelProfiles,
     ...(file.logo ? { logo: file.logo } : {}),
+    logoWidth: file.logoWidth ?? 22,
+    logoBg: file.logoBg ?? "transparent",
+    splash: envBool("CODINGMALO_SPLASH") ?? file.splash ?? true,
   };
 }

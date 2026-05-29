@@ -13,7 +13,7 @@ function read(p: string): string | null {
 }
 
 /**
- * Discover project memory: a global ~/.omcb/AGENTS.md, then every `files` entry (default
+ * Discover project memory: a global ~/.codingmalo/AGENTS.md, then every `files` entry (default
  * AGENTS.md/CLAUDE.md) walking from the repo root down to the workspace, so the nearest/most
  * specific memory appears last. Each block is provenance-fenced. Returns "" when none found.
  */
@@ -28,7 +28,7 @@ export function discoverMemory(workspace: string, files: string[] = ["AGENTS.md"
   let dir = path.resolve(workspace);
   const stop = os.homedir();
   for (;;) {
-    if (dir === stop) break; // never pull memory from the home directory itself (use ~/.omcb/AGENTS.md)
+    if (dir === stop) break; // never pull memory from the home directory itself (use ~/.codingmalo/AGENTS.md)
     dirs.push(dir);
     if (fs.existsSync(path.join(dir, ".git"))) break; // repo root is the natural boundary
     const parent = path.dirname(dir);

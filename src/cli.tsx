@@ -8,6 +8,7 @@ import { AgentDriver } from "./core/driver";
 import { OmcbError } from "./core/errors";
 import { writeMeta } from "./core/meta";
 import type { SessionMeta } from "./core/meta";
+import { migrateLegacyHome } from "./core/paths";
 import { generateSessionId, reconstruct, SessionWriter } from "./core/session";
 import { validateResume } from "./core/meta";
 import type { ImageInput, NormalizedMessage } from "./core/types";
@@ -19,7 +20,7 @@ import type { PermissionMode, SandboxTier } from "./permissions/types";
 import { runInteractive } from "./ui/runInteractive";
 import { VERSION } from "./version";
 
-const HELP = `codingMalo — 直连模型 API 的终端编程 agent（命令 omcb，也可用 codingmalo）
+const HELP = `Coding Malo — 直连模型 API 的终端编程 agent（命令 codingmalo，也可用 omcb）
 
 Usage:
   omcb [prompt]                 Start an interactive session (or run a one-shot prompt).
@@ -131,6 +132,7 @@ function persistMeta(args: {
 }
 
 async function main(): Promise<void> {
+  migrateLegacyHome(); // ~/.omcb → ~/.codingmalo (one-time, best-effort)
   const { values: raw, positionals } = parseArgs({
     args: process.argv.slice(2),
     allowPositionals: true,
@@ -267,6 +269,6 @@ async function main(): Promise<void> {
 
 main().catch((err: unknown) => {
   const message = err instanceof Error ? err.message : String(err);
-  process.stderr.write(`omcb: ${message}\n`);
+  process.stderr.write(`codingmalo: ${message}\n`);
   process.exitCode = 1;
 });

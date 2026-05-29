@@ -36,10 +36,10 @@ describe("ApprovalStore", () => {
   let home: string;
   beforeEach(() => {
     home = fs.mkdtempSync(path.join(os.tmpdir(), "omcb-appr-"));
-    process.env.OMCB_HOME = home;
+    process.env.CODINGMALO_HOME = home;
   });
   afterEach(() => {
-    delete process.env.OMCB_HOME;
+    delete process.env.CODINGMALO_HOME;
     fs.rmSync(home, { recursive: true, force: true });
   });
 

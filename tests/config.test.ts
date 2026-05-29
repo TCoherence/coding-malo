@@ -13,11 +13,15 @@ beforeEach(() => {
   home = fs.mkdtempSync(path.join(os.tmpdir(), "omcb-home-"));
   ws = fs.mkdtempSync(path.join(os.tmpdir(), "omcb-ws-"));
   fs.mkdirSync(path.join(ws, ".git")); // stop walk-up at ws
-  process.env.OMCB_HOME = home;
+  process.env.CODINGMALO_HOME = home;
+  // isolate from a dev machine's base-url env (these sit in the resolved precedence chain)
+  delete process.env.CODINGMALO_BASE_URL;
+  delete process.env.ANTHROPIC_BASE_URL;
+  delete process.env.OPENAI_BASE_URL;
 });
 afterEach(() => {
-  delete process.env.OMCB_HOME;
-  delete process.env.OMCB_TESTVAR;
+  delete process.env.CODINGMALO_HOME;
+  delete process.env.CM_TESTVAR;
   fs.rmSync(home, { recursive: true, force: true });
   fs.rmSync(ws, { recursive: true, force: true });
 });
@@ -26,11 +30,11 @@ describe("layered config", () => {
   it("layers global < project and interpolates ${env:}", () => {
     fs.writeFileSync(
       path.join(home, "config.json"),
-      JSON.stringify({ defaultModel: "global-model", maxTurns: 10, baseUrl: "${env:OMCB_TESTVAR}" }),
+      JSON.stringify({ defaultModel: "global-model", maxTurns: 10, baseUrl: "${env:CM_TESTVAR}" }),
     );
     fs.mkdirSync(path.join(ws, ".omcb"));
     fs.writeFileSync(path.join(ws, ".omcb", "config.json"), JSON.stringify({ defaultModel: "project-model" }));
-    process.env.OMCB_TESTVAR = "https://gw.example";
+    process.env.CM_TESTVAR = "https://gw.example";
 
     const cfg = loadFileConfig(ws);
     expect(cfg.defaultModel).toBe("project-model"); // project wins over global

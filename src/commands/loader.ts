@@ -28,10 +28,15 @@ function parseFrontmatter(raw: string): { description?: string; body: string } {
   return { ...(m ? { description: m[1]!.trim() } : {}), body };
 }
 
-/** Load markdown slash commands from ~/.omcb/commands and <workspace>/.omcb/commands (project wins). */
+/** Load markdown slash commands from ~/.codingmalo/commands and <workspace>/.codingmalo/commands
+ * (project wins; legacy <workspace>/.omcb/commands still read at lower precedence). */
 export function loadCommands(workspace: string): Map<string, SlashCommand> {
   const map = new Map<string, SlashCommand>();
-  const dirs = [path.join(omcbHome(), "commands"), path.join(path.resolve(workspace), ".omcb", "commands")];
+  const dirs = [
+    path.join(omcbHome(), "commands"),
+    path.join(path.resolve(workspace), ".omcb", "commands"),
+    path.join(path.resolve(workspace), ".codingmalo", "commands"),
+  ];
   for (const dir of dirs) {
     if (!fs.existsSync(dir)) continue;
     for (const file of fs.readdirSync(dir)) {

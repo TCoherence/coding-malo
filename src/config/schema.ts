@@ -44,13 +44,19 @@ export const ModelProfileSchema = z.object({
 });
 export type ModelProfile = z.infer<typeof ModelProfileSchema>;
 
-/** The on-disk config (global ~/.omcb/config.json + project .omcb/config.json). All fields optional. */
+/** The on-disk config (global ~/.codingmalo/config.json + project .codingmalo/config.json). All fields optional. */
 export const OmcbConfigSchema = z
   .object({
     /** Free-form comment key (JSON has no comments); ignored. */
     "//": z.string().optional(),
-    /** Path to a banner logo image (PNG/JPG); rendered as half-block text. Default ~/.omcb/logo.png. */
+    /** Path to a banner logo image (PNG/JPG); rendered as half-block text. Default ~/.codingmalo/logo.{png,jpg,jpeg}. */
     logo: z.string().optional(),
+    /** Banner logo width in terminal columns (default 22). Larger = sharper / more detail. */
+    logoWidth: z.number().int().positive().optional(),
+    /** Drop a white-ish logo background to transparent ("transparent", default) or keep it ("keep"). */
+    logoBg: z.enum(["transparent", "keep"]).optional(),
+    /** Play the animated startup splash on interactive launch (default true). */
+    splash: z.boolean().optional(),
     /** Active model: a profile name from `models`, or a raw wire model id. */
     defaultModel: z.string().optional(),
     /** Named model profiles, switchable with /model. e.g. { "deepseek": { provider, model, … } }. */

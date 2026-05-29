@@ -68,14 +68,14 @@ export interface BashInvocation {
 }
 
 /**
- * Decide how to spawn a bash command. With OMCB_SANDBOX_EXEC=1 on macOS (and a non-danger tier),
+ * Decide how to spawn a bash command. With CODINGMALO_SANDBOX_EXEC=1 on macOS (and a non-danger tier),
  * wrap it in sandbox-exec; otherwise run bash directly. Opt-in so the default path is unchanged.
  */
 export function bashInvocation(
   command: string,
   opts: { tier: SandboxTier; workspace: string },
 ): BashInvocation {
-  const enabled = process.env.OMCB_SANDBOX_EXEC === "1";
+  const enabled = process.env.CODINGMALO_SANDBOX_EXEC === "1";
   if (enabled && process.platform === "darwin" && opts.tier !== "danger-full-access") {
     const profile = buildSandboxProfile(opts.tier, opts.workspace, process.env.TMPDIR ?? "/tmp");
     return { file: "sandbox-exec", args: ["-p", profile, "bash", "-c", command] };

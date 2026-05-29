@@ -1,6 +1,7 @@
-# codingMalo
+# Coding Malo
 
-> 命令为 `omcb`（亦可用 `codingmalo`）。仓库目录与内部标识仍沿用 `omcb` / `~/.omcb`。
+> 命令 `codingmalo`（亦保留别名 `omcb`）。配置与会话目录在 `~/.codingmalo`（旧的 `~/.codingmalo` 首次启动自动迁移）。
+> 环境变量前缀为 `CODINGMALO_`（如 `CODINGMALO_MODEL`）。内部类型名仍沿用 `Omcb*`。
 
 A terminal coding agent that talks **directly to model APIs** (Anthropic Messages API today; a
 generic OpenAI-compatible adapter next) — no dependency on any vendor CLI/SDK. It is both an
@@ -38,17 +39,20 @@ echo "summarize README" | node dist/cli.js
 ```
 
 **Models & secrets.** Put API keys in `.env` (gitignored, auto-loaded — copy `.env.example`). Define
-named **model profiles** in `config.json` (global `~/.omcb/config.json` or project `.omcb/config.json`),
+named **model profiles** in `config.json` (global `~/.codingmalo/config.json` or project `.codingmalo/config.json`),
 each with its own `provider` / `model` / `baseUrl` / `apiKey` — reference keys via `${env:VAR}` so the
 file stays commitable (no secrets). See `config.example.json`. Switch with `/model <name>` (interactive)
 or `--model <name>` (headless): this swaps the whole provider + endpoint + key + model in one step.
 
 **Interactive commands:** `/model [name]`, `/help`, `/clear`, `/cost`, `/quit`, plus markdown commands in
-`.omcb/commands/`. `↑/↓` recall history. Tool calls render as live cards; the header shows the model.
+`.codingmalo/commands/`. `↑/↓` recall history. Tool calls render as live cards; the header shows the model.
 
-**Banner logo.** Drop a PNG/JPG at `~/.omcb/logo.png` (or set `"logo": "/abs/path.png"` in config.json)
-and it renders in the welcome banner as half-block truecolor — works in any 24-bit terminal. With no
-image, a built-in block-art monkey is shown. A square-ish small image looks best.
+**Banner logo + splash.** Drop a PNG/JPG at `~/.codingmalo/logo.{png,jpg,jpeg}` (or set
+`"logo": "/abs/path"` in config.json) and it renders as half-block truecolor in any 24-bit terminal.
+A near-white background is dropped to transparent by default (set `"logoBg": "keep"` to keep it);
+`"logoWidth"` (default 22) controls detail. On an interactive launch a larger animated **splash** of
+the same logo plays first (any key skips it; `"splash": false` or `CODINGMALO_SPLASH=0` disables it).
+With no image, a built-in block-art monkey is shown.
 
 ## Headless protocol (NDJSON)
 
@@ -69,5 +73,5 @@ oh-my-agent's `AgentResponse`. Exit code is non-zero when `error_kind` is set.
 - **M6** — sub-agents (`Task`, fg/bg via `TaskManager`) + planning (`update_plan` + live plan panel).
 - **M7** — TUI polish (delta coalescing, input history, double-Ctrl-C) + npm packaging.
 
-65 tests pass; typecheck + build clean; both provider paths and the oh-my-agent integration verified
+83 tests pass; typecheck + build clean; both provider paths and the oh-my-agent integration verified
 live against DeepSeek. Full plan: `~/.claude/plans/mighty-whistling-nest.md`.

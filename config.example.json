@@ -1,5 +1,10 @@
 {
-  "//": "复制到 ~/.omcb/config.json（全局）或 <项目>/.omcb/config.json（项目级）。密钥用 ${env:XXX} 引用 .env，不要写明文。'model' 必须填你在该 provider 控制台里确切可用的模型 id（omcb 原样发给 API，不做任何映射）。运行时用 /model <名字> 或 --model <名字> 切换。",
+  "//": "复制到 ~/.codingmalo/config.json（全局）或 <项目>/.codingmalo/config.json（项目级）。密钥用 ${env:XXX} 引用 .env，不要写明文。'model' 必须填你在该 provider 控制台里确切可用的模型 id（Coding Malo 原样发给 API，不做任何映射）。运行时用 /model <名字> 或 --model <名字> 切换。",
+
+  "logo": "${env:HOME}/.codingmalo/logo.jpeg",
+  "logoWidth": 22,
+  "logoBg": "transparent",
+  "splash": true,
 
   "defaultModel": "deepseek",
 

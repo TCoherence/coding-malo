@@ -32,7 +32,7 @@ export function makeConfig(
     signal: new AbortController().signal,
     sessionId: "sess_test",
     workspace,
-    env: sanitizeEnv([], { OMA_AGENT_HOME: ".omcb" }),
+    env: sanitizeEnv([], { OMA_AGENT_HOME: ".codingmalo" }),
     sandbox: "workspace-write",
     ...overrides,
   };

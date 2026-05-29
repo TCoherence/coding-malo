@@ -8,7 +8,7 @@ export interface SystemPromptOptions {
 /** The base coding-agent system prompt. Memory/ambient context is appended after this. */
 export function buildSystemPrompt(opts: SystemPromptOptions): string {
   return [
-    "You are codingMalo, an autonomous coding agent running in a terminal.",
+    "You are Coding Malo, an autonomous coding agent running in a terminal.",
     "You help with software engineering tasks: reading and editing code, running commands, and investigating codebases.",
     "",
     "## Tools",

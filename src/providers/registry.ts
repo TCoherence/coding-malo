@@ -22,7 +22,7 @@ export function buildProvider(cfg: ProviderConfig): Provider {
     case "openai-compat":
       return new OpenAICompatProvider({
         apiKey: cfg.apiKey ?? process.env.OPENAI_API_KEY ?? process.env.ANTHROPIC_API_KEY,
-        baseUrl: cfg.baseUrl ?? process.env.OPENAI_BASE_URL ?? process.env.OMCB_BASE_URL,
+        baseUrl: cfg.baseUrl ?? process.env.OPENAI_BASE_URL ?? process.env.CODINGMALO_BASE_URL,
       });
     default:
       throw new OmcbError("cli_error", `unknown provider kind: ${String(cfg.kind)}`);

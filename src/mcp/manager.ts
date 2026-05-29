@@ -83,7 +83,7 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 }
 
 async function connectOne(cfg: McpServerConfig): Promise<{ client: Client; tools: Tool[] }> {
-  const client = new Client({ name: "omcb", version: "0.0.0" }, { capabilities: {} });
+  const client = new Client({ name: "codingmalo", version: "0.0.0" }, { capabilities: {} });
   await client.connect(makeTransport(cfg));
   const list = (await client.listTools()) as { tools?: McpToolSpec[] };
   const tools = (list.tools ?? []).map((t) => wrapMcpTool(cfg.name, client, t));

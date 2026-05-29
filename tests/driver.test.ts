@@ -14,10 +14,10 @@ let home: string;
 beforeEach(() => {
   ws = fs.mkdtempSync(path.join(os.tmpdir(), "omcb-drv-"));
   home = fs.mkdtempSync(path.join(os.tmpdir(), "omcb-home-"));
-  process.env.OMCB_HOME = home;
+  process.env.CODINGMALO_HOME = home;
 });
 afterEach(() => {
-  delete process.env.OMCB_HOME;
+  delete process.env.CODINGMALO_HOME;
   fs.rmSync(ws, { recursive: true, force: true });
   fs.rmSync(home, { recursive: true, force: true });
 });
