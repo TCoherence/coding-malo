@@ -31,6 +31,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "e2e": "npm run build && vitest run --config vitest.e2e.config.ts",
     "start": "node dist/cli.js",
     "prepublishOnly": "npm run build"
   },
@@ -45,7 +46,9 @@
   "devDependencies": {
     "@types/node": "^25.9.1",
     "@types/react": "^19.2.15",
+    "@xterm/headless": "^6.0.0",
     "ink-testing-library": "^4.0.0",
+    "node-pty": "^1.1.0",
     "tsup": "^8.5.1",
     "typescript": "^6.0.3",
     "vitest": "^4.1.7"

@@ -30,7 +30,9 @@ cli.tsx → modes.ts ─┬─ interactive → Ink TUI (store + App)
 npm install
 npm run build      # → dist/cli.js (executable, shebang)
 npm run typecheck
-npm test           # vitest
+npm test           # vitest (unit)
+npm run e2e        # real-PTY end-to-end TUI tests: runs the built CLI in a pseudo-terminal
+                   # (node-pty) and reads the rendered screen + cursor back via @xterm/headless
 
 # run it
 node dist/cli.js                       # interactive (needs a TTY)
