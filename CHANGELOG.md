@@ -48,5 +48,5 @@ NDJSON mode, talking directly to model HTTP APIs (no vendor CLI/SDK).
 - **Tests** — 84 unit tests (vitest) + 17 real-PTY end-to-end tests (`node-pty` + `@xterm/headless`,
   run via `npm run e2e`) covering the interactive TUI, headless protocol, and permission flows.
 
-[Unreleased]: https://github.com/OWNER/codingmalo/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/OWNER/codingmalo/releases/tag/v0.1.0
+[Unreleased]: https://github.com/TCoherence/coding-malo/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/TCoherence/coding-malo/releases/tag/v0.1.0

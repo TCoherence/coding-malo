@@ -6,6 +6,14 @@
   "type": "module",
   "license": "MIT",
   "author": "Hanzhi Yang <tcoherence@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TCoherence/coding-malo.git"
+  },
+  "homepage": "https://github.com/TCoherence/coding-malo#readme",
+  "bugs": {
+    "url": "https://github.com/TCoherence/coding-malo/issues"
+  },
   "keywords": [
     "cli",
     "coding-agent",
