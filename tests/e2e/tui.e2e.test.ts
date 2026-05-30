@@ -111,6 +111,16 @@ describe("TUI e2e (real PTY + headless xterm)", () => {
     expect(sess.screen()).toContain("›"); // input still usable
   });
 
+  it("/cost shows a usage notice", async () => {
+    const sess = new TuiSession({ env: env({ CODINGMALO_SPLASH: "0" }) });
+    session = sess;
+    await sess.waitFor((s) => s.includes("›"));
+    sess.type("/cost");
+    sess.enter();
+    await sess.waitFor((s) => s.includes("用量"));
+    expect(sess.screen()).toMatch(/用量:.*↑0 ↓0/); // no turns yet → zero usage
+  });
+
   it("double Ctrl-C exits (single press just arms it)", async () => {
     const sess = new TuiSession({ env: env({ CODINGMALO_SPLASH: "0" }) });
     session = sess;

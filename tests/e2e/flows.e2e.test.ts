@@ -76,6 +76,22 @@ describe("TUI e2e flows (mock provider)", () => {
     await sess.waitFor((s) => s.includes("all done")); // model's follow-up reply
     expect(mock.requestCount()).toBe(2); // round 1 (tool_call) + round 2 (final)
   });
+
+  it("a denied tool (press d) never runs, but the model still continues", async () => {
+    // output "RAN_2" only appears if the echo actually executed; the command text shows "RAN_$((1+1))"
+    mock = await startMockOpenAI({ tool: { name: "Bash", args: { command: "echo RAN_$((1+1))" }, then: "continued without it" } });
+    const sess = new TuiSession({ env: mockEnv(mock.baseUrl) });
+    session = sess;
+    await sess.waitFor((s) => s.includes("›"));
+    sess.type("run it");
+    sess.enter();
+    await sess.waitFor((s) => s.includes("Approval required") && s.includes("Bash"));
+    await sess.settle(150);
+    sess.type("d"); // deny
+    await sess.waitFor((s) => s.includes("continued without it")); // model adapts to the denial
+    expect(sess.screen()).not.toContain("RAN_2"); // the command never executed
+    expect(mock.requestCount()).toBe(2);
+  });
 });
 
 describe("TUI e2e: /model picker", () => {
@@ -132,5 +148,21 @@ describe("TUI e2e: resize", () => {
     expect(narrow).toBeGreaterThanOrEqual(56);
     expect(narrow).toBeLessThanOrEqual(60);
     expect(statusCount()).toBe(1); // no duplicated/overlapping frames after the repaint settles
+  });
+
+  it("widening does NOT trigger a clear (banner stays, no duplicate frame)", async () => {
+    const sess = new TuiSession({ env: { CODINGMALO_HOME: home, CODINGMALO_SPLASH: "0" }, cols: 90, rows: 40 });
+    session = sess;
+    const BANNER = "一只爱写代码的猴子";
+    await sess.waitFor((s) => s.includes(BANNER));
+    await sess.settle(150);
+    const statusCount = () => sess.screen().split("\n").filter((l) => /↑\d+ ↓\d+ · \$/.test(l)).length;
+    const start = sess.bottomBorderWidth(); // prompt box ~90
+
+    sess.resize(120, 40);
+    await sess.waitFor(() => sess.bottomBorderWidth() >= 116); // prompt box widened to ~120
+    expect(sess.bottomBorderWidth()).toBeGreaterThan(start);
+    expect(sess.screen()).toContain(BANNER); // banner NOT wiped (widening doesn't repaint-clear)
+    expect(statusCount()).toBe(1); // single footer — no duplicated frame
   });
 });

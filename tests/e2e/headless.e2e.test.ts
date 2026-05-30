@@ -76,4 +76,32 @@ describe("headless --print (NDJSON protocol)", () => {
     expect(events[resultIdx]?.text ?? "").toContain("HEADLESS_OK");
     expect(code).toBe(0); // success → exit 0
   });
+
+  it("auto-denies a gated tool (non-interactive) and still ends with exactly one result", async () => {
+    mock = await startMockOpenAI({ tool: { name: "Bash", args: { command: "echo HEADLESS_RAN" }, then: "finished after denial" } });
+    home = fs.mkdtempSync(path.join(os.tmpdir(), "cm-headless-"));
+    const { code, stdout } = await runHeadless(
+      ["-p", "run a command", "--output-format", "stream-json", "--permission-mode", "acceptEdits"],
+      {
+        CODINGMALO_HOME: home,
+        CODINGMALO_PROVIDER: "openai-compat",
+        CODINGMALO_MODEL: "mock-model",
+        CODINGMALO_BASE_URL: mock.baseUrl,
+        OPENAI_API_KEY: "test",
+      },
+    );
+    const events = stdout
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as { type: string; name?: string; is_error?: boolean; text?: string });
+
+    const results = events.filter((e) => e.type === "result");
+    expect(results).toHaveLength(1); // the non-interactive contract: always exactly one result, never a hang
+    expect(code).toBe(0);
+    expect(events.some((e) => e.type === "tool_start" && e.name === "Bash")).toBe(true); // gated tool attempted
+    expect(events.some((e) => e.type === "tool_result" && e.is_error === true)).toBe(true); // auto-denied
+    expect(results[0]?.text ?? "").toContain("finished after denial"); // model continued past the denial
+    expect(mock.requestCount()).toBe(2);
+  });
 });
