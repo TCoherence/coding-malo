@@ -238,7 +238,9 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
   }
   const instance = render(
     <App store={store} onSubmit={onSubmit} onInterrupt={onInterrupt} onSelectModel={selectModel} />,
-    { exitOnCtrlC: false },
+    // Force interactive when on a real TTY — Ink otherwise defaults to NON-interactive under CI
+    // (is-in-ci), which would only paint the <Static> banner and never the live prompt frame.
+    { exitOnCtrlC: false, interactive: isTty },
   );
   try {
     await finished;

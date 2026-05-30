@@ -82,6 +82,8 @@ export function runSplash(lines: string[]): Promise<void> {
         resolve();
       });
     };
-    const instance = render(<Splash lines={lines} onDone={done} />, { exitOnCtrlC: false });
+    // interactive:true — runSplash is only called on a real TTY; without it, CI (is-in-ci) would
+    // render non-interactively and instance.clear() (interactive-only) wouldn't erase the splash.
+    const instance = render(<Splash lines={lines} onDone={done} />, { exitOnCtrlC: false, interactive: true });
   });
 }
