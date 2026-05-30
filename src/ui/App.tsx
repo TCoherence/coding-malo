@@ -1,4 +1,4 @@
-import { Box, Static, Text, useCursor, useInput, useStdout } from "ink";
+import { Box, Static, Text, useCursor, useInput } from "ink";
 import type { DOMElement } from "ink";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import stringWidth from "string-width";
@@ -384,35 +384,9 @@ export function App({
   const pendingApproval = state.approvalQueue[0];
   const picker = state.modelPicker;
 
-  // On terminal resize, the terminal reflows old (wider) lines so Ink's relative erase under-clears,
-  // leaving duplicated frames. Do a clean repaint: clear screen + scrollback, then bump staticEpoch
-  // so <Static> re-emits the whole transcript at the new width.
-  const { stdout } = useStdout();
-  const lastWidth = useRef(stdout?.columns ?? 0);
-  const resizeTimer = useRef<NodeJS.Timeout | null>(null);
-  useEffect(() => {
-    if (!stdout) return;
-    lastWidth.current = stdout.columns ?? lastWidth.current;
-    const onResize = (): void => {
-      const w = stdout.columns ?? lastWidth.current; // undefined → treat as unchanged (no false shrink)
-      if (w <= 0) return;
-      const shrank = w < lastWidth.current; // only width-DECREASE reflows old lines into the mess
-      lastWidth.current = w;
-      if (!shrank) return;
-      // Debounce drag-resizes into a single repaint; the timer also moves the raw clear off Ink's
-      // synchronous render path, avoiding interleaving with an in-flight frame.
-      if (resizeTimer.current) clearTimeout(resizeTimer.current);
-      resizeTimer.current = setTimeout(() => {
-        stdout.write("\x1b[2J\x1b[3J\x1b[H");
-        store.bumpStaticEpoch();
-      }, 120);
-    };
-    stdout.on("resize", onResize);
-    return () => {
-      stdout.off("resize", onResize);
-      if (resizeTimer.current) clearTimeout(resizeTimer.current);
-    };
-  }, [stdout, store]);
+  // NOTE: no manual clear-on-resize. We let the terminal reflow scrollback naturally (like Claude
+  // Code / Codex) so prior turns are never lost. (An earlier "clean repaint" that wiped scrollback
+  // looked like it deleted history in real terminals.) `/clear` still clears intentionally.
 
   useInput((input, key) => {
     if (key.ctrl && input === "c") {

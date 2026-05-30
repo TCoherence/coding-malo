@@ -113,56 +113,39 @@ describe("TUI e2e: /model picker", () => {
   });
 });
 
-describe("TUI e2e: resize", () => {
-  it("reflows the prompt box to the new width when the terminal is resized narrower", async () => {
-    const sess = new TuiSession({ env: { CODINGMALO_HOME: home, CODINGMALO_SPLASH: "0" }, cols: 100, rows: 40 });
+describe("TUI e2e: resize (history is preserved — the terminal reflows natively)", () => {
+  it("shrinking keeps prior turns and reflows the prompt narrower", async () => {
+    mock = await startMockOpenAI({ reply: "okreply" });
+    const sess = new TuiSession({ env: mockEnv(mock.baseUrl), cols: 100, rows: 20 });
     session = sess;
     await sess.waitFor((s) => s.includes("›"));
+    sess.type("HISTMARK");
+    sess.enter();
+    await sess.waitFor((s) => s.includes("HISTMARK") && s.includes("okreply"));
     await sess.settle(150);
     const wide = sess.bottomBorderWidth();
-    expect(wide).toBeGreaterThan(90); // prompt box spans ~100 cols
+    expect(wide).toBeGreaterThan(90); // prompt box ~100 cols
 
-    // width of the bottom-most box-border line — i.e. the re-rendered prompt box at the new size
-    const lastBorderWidth = (): number => {
-      const ls = sess.screen().split("\n");
-      for (let i = ls.length - 1; i >= 0; i--) {
-        const l = ls[i] ?? "";
-        if (l.trim() === "") continue;
-        return l.includes("╰") || l.includes("╯") ? l.length : -1;
-      }
-      return -1;
-    };
-
-    // footer status lines, matched structurally (↑N ↓N · $cost) — not a loose substring
-    const statusCount = () => sess.screen().split("\n").filter((l) => /↑\d+ ↓\d+ · \$/.test(l)).length;
-
-    sess.resize(60, 40);
-    // Wait for the SETTLED clean repaint (debounced): bottom border ~60 AND a single footer.
-    // Ink's own resize render briefly shows a duplicated/overlapping frame before our repaint.
-    await sess.waitFor(() => {
-      const w = lastBorderWidth();
-      return w >= 56 && w <= 60 && statusCount() === 1;
-    }, 8000);
-    const narrow = lastBorderWidth();
-    expect(narrow).toBeLessThan(wide);
-    expect(narrow).toBeGreaterThanOrEqual(56);
-    expect(narrow).toBeLessThanOrEqual(60);
-    expect(statusCount()).toBe(1); // no duplicated/overlapping frames after the repaint settles
+    sess.resize(60, 20);
+    await sess.waitFor(() => sess.bottomBorderWidth() >= 56 && sess.bottomBorderWidth() <= 60);
+    expect(sess.bottomBorderWidth()).toBeLessThan(wide); // prompt reflowed narrower
+    expect(sess.screen()).toContain("HISTMARK"); // ← the prior turn is NOT lost on resize
   });
 
-  it("widening does NOT trigger a clear (banner stays, no duplicate frame)", async () => {
-    const sess = new TuiSession({ env: { CODINGMALO_HOME: home, CODINGMALO_SPLASH: "0" }, cols: 90, rows: 40 });
+  it("widening keeps prior turns and reflows the prompt wider", async () => {
+    mock = await startMockOpenAI({ reply: "okreply" });
+    const sess = new TuiSession({ env: mockEnv(mock.baseUrl), cols: 80, rows: 20 });
     session = sess;
-    const BANNER = "一只爱写代码的猴子";
-    await sess.waitFor((s) => s.includes(BANNER));
+    await sess.waitFor((s) => s.includes("›"));
+    sess.type("WIDEMARK");
+    sess.enter();
+    await sess.waitFor((s) => s.includes("WIDEMARK") && s.includes("okreply"));
     await sess.settle(150);
-    const statusCount = () => sess.screen().split("\n").filter((l) => /↑\d+ ↓\d+ · \$/.test(l)).length;
-    const start = sess.bottomBorderWidth(); // prompt box ~90
+    const narrow = sess.bottomBorderWidth(); // prompt box ~80
 
-    sess.resize(120, 40);
-    await sess.waitFor(() => sess.bottomBorderWidth() >= 116); // prompt box widened to ~120
-    expect(sess.bottomBorderWidth()).toBeGreaterThan(start);
-    expect(sess.screen()).toContain(BANNER); // banner NOT wiped (widening doesn't repaint-clear)
-    expect(statusCount()).toBe(1); // single footer — no duplicated frame
+    sess.resize(120, 20);
+    await sess.waitFor(() => sess.bottomBorderWidth() >= 116); // prompt reflowed wider
+    expect(sess.bottomBorderWidth()).toBeGreaterThan(narrow);
+    expect(sess.screen()).toContain("WIDEMARK"); // prior turn preserved
   });
 });
