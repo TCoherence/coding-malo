@@ -19,8 +19,10 @@ npm test           # vitest — fast unit suite
 npm run e2e        # builds, then real-PTY end-to-end tests (node-pty + @xterm/headless)
 ```
 
-All three must pass. CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the same on
-every PR and gates merges.
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs all of these on every PR. The
+typecheck + build + unit jobs gate merges; **`npm run e2e` is authoritative locally (macOS)** but runs
+non-blocking on CI for now — the live Ink frame doesn't paint under the headless Linux runner (only
+the `<Static>` banner renders), so always run the e2e suite locally before sending TUI changes.
 
 > Heads up: `node-pty`'s prebuilt `spawn-helper` sometimes lands without the executable bit; the e2e
 > harness re-`chmod +x`'s it on startup, so `npm run e2e` works on a fresh `npm install`.
