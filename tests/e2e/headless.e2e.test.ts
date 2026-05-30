@@ -104,4 +104,33 @@ describe("headless --print (NDJSON protocol)", () => {
     expect(results[0]?.text ?? "").toContain("finished after denial"); // model continued past the denial
     expect(mock.requestCount()).toBe(2);
   });
+
+  it("--resume reconstructs prior history into the next turn", async () => {
+    mock = await startMockOpenAI({ reply: "ok" });
+    home = fs.mkdtempSync(path.join(os.tmpdir(), "cm-headless-"));
+    const baseEnv = {
+      CODINGMALO_HOME: home,
+      CODINGMALO_PROVIDER: "openai-compat",
+      CODINGMALO_MODEL: "mock-model",
+      CODINGMALO_BASE_URL: mock.baseUrl,
+      OPENAI_API_KEY: "test",
+    };
+    const parse = (s: string) =>
+      s.trim().split("\n").filter(Boolean).map((l) => JSON.parse(l) as { type: string; session_id?: string });
+
+    // turn 1 — captures a session id
+    const r1 = await runHeadless(["-p", "REMEMBER_APPLE", "--output-format", "stream-json"], baseEnv);
+    const sid = parse(r1.stdout).find((e) => e.type === "init")?.session_id;
+    expect(sid).toBeTruthy();
+
+    // turn 2 — resume that session
+    const r2 = await runHeadless(["--resume", sid!, "-p", "what did I say?", "--output-format", "stream-json"], baseEnv);
+    expect(r2.code).toBe(0);
+    expect(parse(r2.stdout).find((e) => e.type === "init")?.session_id).toBe(sid); // same session id reused
+
+    // the resumed turn's request to the model carried the prior conversation
+    const bodies = mock.bodies();
+    const lastMessages = JSON.stringify(bodies[bodies.length - 1]?.messages ?? []);
+    expect(lastMessages).toContain("REMEMBER_APPLE"); // turn-1 user message was replayed as history
+  });
 });

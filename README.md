@@ -1,79 +1,100 @@
-# Coding Malo
+# Coding Malo 🐒
 
-> 命令 `codingmalo`（亦保留别名 `omcb`）。配置与会话目录在 `~/.codingmalo`（旧的 `~/.codingmalo` 首次启动自动迁移）。
-> 环境变量前缀为 `CODINGMALO_`（如 `CODINGMALO_MODEL`）。内部类型名仍沿用 `Omcb*`。
+A terminal coding agent that talks **directly to model HTTP APIs** — no dependency on any vendor
+CLI or SDK. It's both an interactive [Ink](https://github.com/vadimdemedes/ink) TUI (like Claude Code
+/ Codex) and a headless `--print` mode that emits a clean NDJSON event protocol, so it can also drop
+in behind orchestrators in place of `claude` / `codex` / `gemini`.
 
-A terminal coding agent that talks **directly to model APIs** (Anthropic Messages API today; a
-generic OpenAI-compatible adapter next) — no dependency on any vendor CLI/SDK. It is both an
-interactive Ink TUI and a headless `--print` mode that emits a clean NDJSON event protocol, so it
-can drop in behind orchestrators like `oh-my-agent` in place of `claude`/`codex`/`gemini`.
+Command: **`codingmalo`** (alias `omcb`). Config & sessions live in `~/.codingmalo`.
 
-## Architecture: one engine, N renderers
+## Features
 
-A single agent loop — `core/engine.ts`, `async function* run(): AsyncIterable<OmcbEvent>` — is the
-only producer of protocol events. The Ink TUI, the headless JSON renderer, and the session JSONL
-writer are independent consumers of that one stream, so interactive and headless can never drift.
+- **Direct to model APIs** — native Anthropic Messages API (streaming, prompt caching, extended
+  thinking) + a generic OpenAI-compatible adapter (OpenAI, DeepSeek, Gemini, gateways).
+- **Real coding agent** — Bash / Read / Write / Edit / Grep / Glob / Web / sub-agents (`Task`) /
+  planning, with a permission engine + sandbox.
+- **Polished TUI** — streaming text & thinking, live tool cards, `/model` picker, slash commands,
+  input history & cursor editing, correct CJK/IME caret, inline rendering (keeps native scrollback).
+- **Headless NDJSON** — a stable [event protocol](docs/headless-protocol.md) with exit codes, for
+  scripting and orchestration.
+- **Extensible** — MCP (stdio + http), Skills, project memory (`AGENTS.md`/`CLAUDE.md`), markdown
+  slash commands, lifecycle hooks, layered config with model profiles.
 
-```
-cli.tsx → modes.ts ─┬─ interactive → Ink TUI (store + App)
-                    └─ --print     → JsonRenderer (NDJSON)   both drain the same OmcbEvent stream
-                                   ↓
-                        core/engine.ts (the loop)
-                                   ↓
-              providers/* (anthropic | openai-compat)   tools/* (registry + builtins)
-                                                          permissions/* (modes + sandbox)
-```
+## Quickstart
 
-## Develop
+Requires Node ≥ 20.
 
 ```bash
 npm install
-npm run build      # → dist/cli.js (executable, shebang)
-npm run typecheck
-npm test           # vitest (unit)
-npm run e2e        # real-PTY end-to-end TUI tests: runs the built CLI in a pseudo-terminal
-                   # (node-pty) and reads the rendered screen + cursor back via @xterm/headless
+npm run build                          # → dist/cli.js
 
-# run it
 node dist/cli.js                       # interactive (needs a TTY)
-node dist/cli.js -p "list files"       # headless NDJSON
-echo "summarize README" | node dist/cli.js
+node dist/cli.js -p "list files"       # headless, NDJSON on stdout
+echo "summarize the README" | node dist/cli.js -p
 ```
 
-**Models & secrets.** Put API keys in `.env` (gitignored, auto-loaded — copy `.env.example`). Define
-named **model profiles** in `config.json` (global `~/.codingmalo/config.json` or project `.codingmalo/config.json`),
-each with its own `provider` / `model` / `baseUrl` / `apiKey` — reference keys via `${env:VAR}` so the
-file stays commitable (no secrets). See `config.example.json`. Switch with `/model <name>` (interactive)
-or `--model <name>` (headless): this swaps the whole provider + endpoint + key + model in one step.
+Put a key in a gitignored `.env` (auto-loaded — copy `.env.example`) and a model profile in
+`~/.codingmalo/config.json` (see `config.example.json`):
 
-**Interactive commands:** `/model [name]`, `/help`, `/clear`, `/cost`, `/quit`, plus markdown commands in
-`.codingmalo/commands/`. `↑/↓` recall history. Tool calls render as live cards; the header shows the model.
+```jsonc
+{
+  "defaultModel": "deepseek",
+  "models": {
+    "deepseek": { "provider": "anthropic", "model": "deepseek-v4-flash",
+                  "baseUrl": "https://api.deepseek.com/anthropic", "apiKey": "${env:DEEPSEEK_API_KEY}" }
+  }
+}
+```
 
-**Banner logo + splash.** Drop a PNG/JPG at `~/.codingmalo/logo.{png,jpg,jpeg}` (or set
-`"logo": "/abs/path"` in config.json) and it renders as half-block truecolor in any 24-bit terminal.
-A near-white background is dropped to transparent by default (set `"logoBg": "keep"` to keep it);
-`"logoWidth"` (default 22) controls detail. On an interactive launch a larger animated **splash** of
-the same logo plays first (any key skips it; `"splash": false` or `CODINGMALO_SPLASH=0` disables it).
-With no image, a built-in block-art monkey is shown.
+Switch models live with `/model <name>` (or `--model <name>` headless). Full reference:
+[docs/configuration.md](docs/configuration.md).
 
-## Headless protocol (NDJSON)
+## Interactive commands
 
-Events: `init`, `message_start`, `thinking_delta`, `text_delta`, `tool_start`, `tool_result`,
-`plan`, `message_stop`, `usage` (per-turn), and exactly one terminal `result` (cumulative `usage`,
-optional `error` + `error_kind`). `usage`/`error_kind`/`session_id` field names map directly onto
-oh-my-agent's `AgentResponse`. Exit code is non-zero when `error_kind` is set.
-`--output-format`: `stream-json` (default), `json` (init+result only), `text` (final text only).
+`/model [name]` · `/help` · `/clear` · `/cost` · `/quit`, plus markdown commands in
+`.codingmalo/commands/`. `↑/↓` recall history; `←/→`, `Ctrl+A`/`Ctrl+E` move the caret; double
+`Ctrl+C` exits.
 
-## Status — all milestones shipped (M0–M7)
+**Banner & splash.** Drop a `PNG`/`JPG` at `~/.codingmalo/logo.{png,jpg,jpeg}` for a half-block
+truecolor logo (near-white background dropped automatically; animated splash on launch). Tunable via
+`logo` / `logoWidth` / `logoBg` / `splash` — see [docs/configuration.md](docs/configuration.md).
 
-- **M0** — engine spine: Anthropic streaming, agent loop, builtin tools (Bash/Read/Write/Edit), session store + `--resume`, headless print mode, Ink TUI.
-- **M1** — providers: Anthropic prompt-caching + extended thinking, OpenAI-compatible adapter, cost accounting, status-first error classification.
-- **M2** — permissions + sandbox: modes (plan/default/acceptEdits/bypass), interactive approval modal + remembered decisions, env sanitization, opt-in macOS `sandbox-exec`.
-- **M3** — oh-my-agent integration: a Python `OmcbCLIAgent` adapter (`/Users/yanghanzhi/repos/oh-my-agent`) that drives omcb as a drop-in for claude/codex/gemini.
-- **M4** — layered config (`${env:}`, zod), project memory (AGENTS.md/CLAUDE.md), markdown slash commands, lifecycle hooks (Pre/PostToolUse, UserPromptSubmit, Session*, Stop).
-- **M5** — MCP client (stdio + http) + Skills (SKILL.md progressive disclosure).
-- **M6** — sub-agents (`Task`, fg/bg via `TaskManager`) + planning (`update_plan` + live plan panel).
-- **M7** — TUI polish (delta coalescing, input history, double-Ctrl-C) + npm packaging.
+## Headless protocol
 
-83 tests pass; typecheck + build clean; both provider paths and the oh-my-agent integration verified
-live against DeepSeek. Full plan: `~/.claude/plans/mighty-whistling-nest.md`.
+```bash
+codingmalo -p "list files then read package.json" --output-format stream-json
+```
+
+Emits `init` → per-turn events (`text_delta`, `tool_start`, `tool_result`, `usage`, …) → exactly one
+terminal `result`. `--output-format` is `stream-json` (default) / `json` / `text`; exit code is
+non-zero when `result.error_kind` is set. Full spec: [docs/headless-protocol.md](docs/headless-protocol.md).
+
+## Documentation
+
+- [Architecture](docs/architecture.md) — "one engine, N renderers", module layout, rendering model
+- [Configuration](docs/configuration.md) — layering, model profiles, env vars, logo/splash
+- [Headless protocol](docs/headless-protocol.md) — the NDJSON event contract
+- [Permissions & sandbox](docs/permissions-and-sandbox.md) — modes, approval flow, sandbox tiers
+- [Contributing](CONTRIBUTING.md) · [Releasing](RELEASING.md) · [Changelog](CHANGELOG.md)
+
+## Development
+
+```bash
+npm run typecheck   # tsc --noEmit (strict)
+npm test            # vitest — unit
+npm run e2e         # real-PTY end-to-end (node-pty + @xterm/headless): builds, then drives the
+                    # built CLI in a pseudo-terminal and asserts the rendered screen + cursor
+```
+
+CI runs all of these on every PR (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+
+## Status
+
+All milestones shipped (M0–M7): engine + providers + tools + permissions/sandbox + interactive TUI +
+headless protocol + sessions/`--resume` + MCP + Skills + sub-agents/planning + memory/commands/hooks.
+**84 unit tests + 17 end-to-end tests** green; typecheck + build clean; both provider paths verified
+live against DeepSeek.
+
+## License
+
+[MIT](LICENSE) © Hanzhi Yang

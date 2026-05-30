@@ -5,6 +5,7 @@
   "description": "codingMalo — a terminal coding agent that talks directly to model APIs (Anthropic + OpenAI-compatible), with an interactive Ink TUI and a headless NDJSON print mode.",
   "type": "module",
   "license": "MIT",
+  "author": "Hanzhi Yang <tcoherence@gmail.com>",
   "keywords": [
     "cli",
     "coding-agent",

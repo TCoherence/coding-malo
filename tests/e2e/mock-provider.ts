@@ -1,9 +1,13 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 
+type ChatBody = { messages?: { role?: string; content?: unknown }[] };
+
 export interface MockHandle {
   baseUrl: string;
   requestCount: () => number;
+  /** Parsed request bodies in arrival order — lets tests assert what was sent (e.g. resumed history). */
+  bodies: () => ChatBody[];
   close: () => Promise<void>;
 }
 
@@ -27,6 +31,7 @@ function chunkString(s: string): string[] {
  */
 export async function startMockOpenAI(opts: MockOptions): Promise<MockHandle> {
   let requests = 0;
+  const bodies: ChatBody[] = [];
   const server = http.createServer((req, res) => {
     if (req.method !== "POST" || !req.url?.endsWith("/chat/completions")) {
       res.writeHead(404).end();
@@ -36,12 +41,14 @@ export async function startMockOpenAI(opts: MockOptions): Promise<MockHandle> {
     req.on("data", (c) => (raw += c));
     req.on("end", () => {
       requests++;
-      let messages: { role?: string }[] = [];
+      let body: ChatBody = {};
       try {
-        messages = (JSON.parse(raw).messages as { role?: string }[]) ?? [];
+        body = JSON.parse(raw) as ChatBody;
       } catch {
         // leave empty
       }
+      bodies.push(body);
+      const messages = body.messages ?? [];
       const sawToolResult = messages.some((m) => m.role === "tool");
       res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
       const id = "chatcmpl-mock";
@@ -81,6 +88,7 @@ export async function startMockOpenAI(opts: MockOptions): Promise<MockHandle> {
   return {
     baseUrl: `http://127.0.0.1:${port}`,
     requestCount: () => requests,
+    bodies: () => bodies,
     close: () => new Promise((resolve) => server.close(() => resolve())),
   };
 }

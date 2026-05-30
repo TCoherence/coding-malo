@@ -1,5 +1,7 @@
+import pkg from "../package.json";
+
 /**
- * Single source of truth for the Coding Malo version (shown by `--version` and in the TUI banner).
- * Keep this in sync with package.json's "version" when bumping.
+ * The Coding Malo version, shown by `--version` and in the TUI banner.
+ * Single source of truth = package.json's "version" (inlined at build time). Bump with `npm version`.
  */
-export const VERSION = "0.1.0";
+export const VERSION: string = pkg.version;
