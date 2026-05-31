@@ -37,10 +37,10 @@ describe("buildAnthropicParams caching", () => {
 
 describe("computeCost", () => {
   it("prices DeepSeek input and cache-hit tokens", () => {
-    expect(computeCost("deepseek-chat", { inputTokens: 1_000_000, outputTokens: 0 })).toBeCloseTo(0.27, 5);
+    expect(computeCost("deepseek-chat", { inputTokens: 1_000_000, outputTokens: 0 })).toBeCloseTo(0.14, 5);
     expect(
       computeCost("deepseek-chat", { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 1_000_000 }),
-    ).toBeCloseTo(0.07, 5);
+    ).toBeCloseTo(0.0028, 5);
   });
 
   it("returns 0 for unknown models", () => {

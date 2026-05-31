@@ -31,6 +31,7 @@ interface OpenAIUsage {
   completion_tokens?: number;
   prompt_tokens_details?: { cached_tokens?: number };
   prompt_cache_hit_tokens?: number;
+  prompt_cache_miss_tokens?: number;
 }
 interface OpenAIChunk {
   id?: string;
@@ -54,9 +55,12 @@ function mapFinish(reason: string | null | undefined): StopReason {
 function mapUsage(u: OpenAIUsage | null | undefined): NormalizedUsage {
   const usage = emptyUsage();
   if (!u) return usage;
-  usage.inputTokens = u.prompt_tokens ?? 0;
+  const cacheRead = u.prompt_cache_hit_tokens ?? u.prompt_tokens_details?.cached_tokens ?? 0;
+  // OpenAI's prompt_tokens INCLUDES cached tokens; bill only the cache-miss portion at full input
+  // price (cached is billed separately as cacheRead) so cache hits aren't double-counted in cost.
+  usage.inputTokens = u.prompt_cache_miss_tokens ?? Math.max(0, (u.prompt_tokens ?? 0) - cacheRead);
   usage.outputTokens = u.completion_tokens ?? 0;
-  usage.cacheReadInputTokens = u.prompt_cache_hit_tokens ?? u.prompt_tokens_details?.cached_tokens ?? 0;
+  usage.cacheReadInputTokens = cacheRead;
   return usage;
 }
 
