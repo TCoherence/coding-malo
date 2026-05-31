@@ -1,0 +1,5 @@
+.venv/
+logs/
+predictions.*.jsonl
+*.json
+!*.example.json
