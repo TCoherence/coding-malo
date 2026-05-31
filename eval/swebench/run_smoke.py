@@ -82,6 +82,12 @@ def run_agent(row: dict, model: str | None, max_turns: int, timeout: int) -> dic
     work = tempfile.mkdtemp(prefix="swebench-")
     subprocess.run(["git", "clone", "--quiet", f"https://github.com/{repo}.git", work], check=True)
     subprocess.run(["git", "-C", work, "checkout", "--quiet", base], check=True)
+    # Keep test-run / build artifacts out of the captured diff: if the agent runs the test suite,
+    # pytest/hypothesis/etc. drop caches that `git add -A` would otherwise sweep into the patch
+    # (e.g. .hypothesis/…/charmap.json.gz), polluting the prediction. Excluded files won't be staged.
+    junk = [".hypothesis/", ".pytest_cache/", "__pycache__/", "*.pyc", "*.egg-info/",
+            ".coverage", ".coverage.*", "htmlcov/", "build/", "dist/", ".tox/", "node_modules/"]
+    pathlib.Path(work, ".git", "info", "exclude").write_text("\n".join(junk) + "\n")
     prompt = (
         "You are resolving a GitHub issue in this repository. Make the minimal source-code change "
         "required to fix the issue. Do NOT modify or add tests.\n\n--- Issue ---\n" + problem
