@@ -33,13 +33,20 @@ python3 -m venv .venv
 #    Expect resolved == true for the instance.
 .venv/bin/python run_smoke.py --gold --instance-ids <instance_id> --run-id validate-gold
 
-# 3) a real smoke: run Coding Malo on 1–3 instances, then score.
+# 3) a real run: a repo-stratified subset of N instances, then score + summarize.
 DEEPSEEK_API_KEY=… .venv/bin/python run_smoke.py \
-  --instance-ids <instance_id> --model deepseek-v4-flash --max-turns 30 --run-id smoke
+  --subset 20 --model deepseek-v4-flash --max-turns 40 --workers 4 --run-id v0.1.0-baseline
+#   (or --instance-ids A B C for specific ones)
 ```
 
-The harness writes per-instance logs under `logs/` and a `*.json` report (resolved/unresolved counts)
-in the cwd. Agent predictions are written to `predictions.<run-id>.jsonl`.
+`--subset N` picks a deterministic, repo-balanced sample. The runner captures per-instance
+token usage + cost (via `--output-format stream-json`), runs the harness, then prints a summary:
+**resolved rate (X/N), per-instance turns/tokens/cost, total cost, and a full-300 projection.**
+The harness writes per-instance logs under `logs/` and a `coding-malo.<run-id>.json` report; agent
+predictions go to `predictions.<run-id>.jsonl`.
+
+> Disk: each repo's eval image is GBs; a 20-task spread touches ~all 12 repos. `docker image prune`
+> after a run to reclaim space.
 
 ## How the agent is invoked (per instance)
 
