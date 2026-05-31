@@ -30,6 +30,18 @@ CLI = REPO_ROOT / "dist" / "cli.js"
 HERE = pathlib.Path(__file__).resolve().parent
 MODEL_TAG = "coding-malo"  # model_name_or_path → report file is f"{MODEL_TAG}.{run_id}.json"
 
+# --- docker agent mode (tests are RUNNABLE inside the SWE-bench instance image) ---
+# Default host mode clones a bare repo (no deps → the agent can't run the suite). Docker mode runs
+# the agent inside the same image the scorer uses (/testbed @ base_commit + the `testbed` conda env
+# with all deps), so the "verify by running tests" lever actually works. The agent (pure-JS runtime)
+# is bind-mounted in cross-arch: host dist/ + node_modules/ + a linux-x64 node + ~/.codingmalo config.
+NODE_LINUX = HERE / ".node-linux-x64"          # `setup.sh`-downloaded linux-x64 node (bin/node)
+HOST_CONFIG = pathlib.Path.home() / ".codingmalo" / "config.json"  # model→provider profiles
+KEY_ENVS = ["DEEPSEEK_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"]
+# untracked test/build artifacts the agent's test runs create — keep them out of the captured diff
+JUNK = [".hypothesis/", ".pytest_cache/", "__pycache__/", "*.pyc", "*.egg-info/",
+        ".coverage", ".coverage.*", "htmlcov/", "build/", "dist/", ".tox/", "node_modules/"]
+
 
 def all_rows() -> list[dict]:
     from datasets import load_dataset
@@ -76,7 +88,15 @@ def pick_rows(ids: list[str]) -> list[dict]:
     return rows
 
 
-def run_agent(row: dict, model: str | None, max_turns: int, timeout: int) -> dict:
+def _build_prompt(problem: str) -> str:
+    return (
+        "You are resolving a GitHub issue in this repository. Make the minimal source-code change "
+        "required to fix the issue. Do NOT modify or add tests.\n\n--- Issue ---\n" + problem
+    )
+
+
+def run_agent(row: dict, model: str | None, max_turns: int, timeout: int,
+              extra_prompt: str | None = None) -> dict:
     """Clone repo@base_commit, run Coding Malo headless, return {patch, turns, error_kind, usage}."""
     repo, base, problem = row["repo"], row["base_commit"], row["problem_statement"]
     work = tempfile.mkdtemp(prefix="swebench-")
@@ -85,18 +105,15 @@ def run_agent(row: dict, model: str | None, max_turns: int, timeout: int) -> dic
     # Keep test-run / build artifacts out of the captured diff: if the agent runs the test suite,
     # pytest/hypothesis/etc. drop caches that `git add -A` would otherwise sweep into the patch
     # (e.g. .hypothesis/…/charmap.json.gz), polluting the prediction. Excluded files won't be staged.
-    junk = [".hypothesis/", ".pytest_cache/", "__pycache__/", "*.pyc", "*.egg-info/",
-            ".coverage", ".coverage.*", "htmlcov/", "build/", "dist/", ".tox/", "node_modules/"]
-    pathlib.Path(work, ".git", "info", "exclude").write_text("\n".join(junk) + "\n")
-    prompt = (
-        "You are resolving a GitHub issue in this repository. Make the minimal source-code change "
-        "required to fix the issue. Do NOT modify or add tests.\n\n--- Issue ---\n" + problem
-    )
+    pathlib.Path(work, ".git", "info", "exclude").write_text("\n".join(JUNK) + "\n")
+    prompt = _build_prompt(problem)
     cmd = [
         "node", str(CLI), "-p", "--output-format", "stream-json",
         "--workspace", work, "--permission-mode", "bypass",
         "--sandbox", "danger-full-access", "--max-turns", str(max_turns),
     ]
+    if extra_prompt:
+        cmd += ["--append-system-prompt", extra_prompt]
     if model:
         cmd += ["--model", model]
     print(f"  → {row['instance_id']} ({repo}@{base[:8]}) …", flush=True)
@@ -127,6 +144,99 @@ def run_agent(row: dict, model: str | None, max_turns: int, timeout: int) -> dic
     print(f"    ← {len(patch.splitlines())} diff lines, turns={meta['turns']}, "
           f"err={meta['error_kind']}, cost=${usage.get('cost_usd', 0):.4f}", flush=True)
     return meta
+
+
+def _result_event(stream_text: str) -> dict | None:
+    last = None
+    for line in stream_text.splitlines():
+        try:
+            e = json.loads(line)
+        except Exception:
+            continue
+        if e.get("type") == "result":
+            last = e
+    return last
+
+
+def _meta(result_event: dict | None, patch: str, iid: str) -> dict:
+    usage = result_event.get("usage", {}) if result_event else {}
+    meta = {
+        "patch": patch,
+        "turns": (result_event or {}).get("turns_used"),
+        "error_kind": (result_event or {}).get("error_kind"),
+        "usage": usage,
+    }
+    print(f"    ← {len(patch.splitlines())} diff lines, turns={meta['turns']}, "
+          f"err={meta['error_kind']}, cost=${usage.get('cost_usd', 0):.4f}", flush=True)
+    return meta
+
+
+def _instance_image(row: dict) -> str:
+    """The exact image the scorer uses (handles the __ → _1776_ tag normalization + namespace)."""
+    from swebench.harness.test_spec.test_spec import make_test_spec
+
+    return make_test_spec(row, namespace="swebench").instance_image_key
+
+
+def ensure_image(image: str) -> None:
+    if subprocess.run(["docker", "image", "inspect", image], capture_output=True).returncode == 0:
+        return
+    print(f"    · pulling {image} …", flush=True)
+    subprocess.run(["docker", "pull", "--platform", "linux/amd64", image], check=True)
+
+
+def run_agent_docker(row: dict, model: str | None, max_turns: int, timeout: int,
+                     extra_prompt: str | None = None) -> dict:
+    """Run Coding Malo INSIDE the SWE-bench instance image, where the repo's tests are runnable.
+
+    /testbed is the repo @ base_commit with the `testbed` conda env (deps installed) on PATH. The
+    pure-JS agent is bind-mounted cross-arch (arm64 host → x86_64 image): dist/ + node_modules/ + a
+    linux-x64 node + the host ~/.codingmalo config (model→provider profiles). The agent runs tests
+    via its Bash tool against that env; we then capture `git -C /testbed diff` as the prediction.
+    """
+    iid, repo, base, problem = row["instance_id"], row["repo"], row["base_commit"], row["problem_statement"]
+    image = _instance_image(row)
+    print(f"  → {iid} ({repo}@{base[:8]}) [docker {image}] …", flush=True)
+    ensure_image(image)
+    out = tempfile.mkdtemp(prefix="swebench-docker-")
+    pathlib.Path(out, "prompt.txt").write_text(_build_prompt(problem))
+    model_flag = f"--model {model} " if model else ""
+    # variant guidance is injected via --append-system-prompt (read from a mounted file inside the
+    # container) so baseline vs candidate differ by ONE flag against the SAME dist — no rebuild.
+    append_flag = ""
+    if extra_prompt:
+        pathlib.Path(out, "extra.txt").write_text(extra_prompt)
+        append_flag = '--append-system-prompt "$(cat /out/extra.txt)" '
+    # inner script: keep test-run junk out of the diff, run the agent, then capture the diff
+    inner = (
+        'printf "%s\\n" ' + " ".join(f"'{p}'" for p in JUNK) + ' > /testbed/.git/info/exclude; '
+        f"/opt/node/bin/node /cm/dist/cli.js -p --output-format stream-json "
+        f"--workspace /testbed --permission-mode bypass --sandbox danger-full-access "
+        f"--max-turns {max_turns} {model_flag}{append_flag}< /out/prompt.txt > /out/stream.jsonl 2>/out/stderr.txt; "
+        "cd /testbed && git add -A && git diff --cached > /out/patch.diff"
+    )
+    cmd = ["docker", "run", "--rm", "--platform", "linux/amd64"]
+    for k in KEY_ENVS:
+        if os.environ.get(k):
+            cmd += ["-e", k]
+    cmd += [
+        "-v", f"{REPO_ROOT/'dist'}:/cm/dist:ro",
+        "-v", f"{REPO_ROOT/'node_modules'}:/cm/node_modules:ro",
+        "-v", f"{REPO_ROOT/'package.json'}:/cm/package.json:ro",
+        "-v", f"{NODE_LINUX}:/opt/node:ro",
+        "-v", f"{HOST_CONFIG}:/root/.codingmalo/config.json:ro",
+        "-v", f"{out}:/out",
+        image, "bash", "-lc", inner,
+    ]
+    try:
+        subprocess.run(cmd, env=dict(os.environ), timeout=timeout)
+    except subprocess.TimeoutExpired:
+        print(f"    ! agent timed out after {timeout}s", flush=True)
+    stream = pathlib.Path(out, "stream.jsonl")
+    patch_file = pathlib.Path(out, "patch.diff")
+    result_event = _result_event(stream.read_text()) if stream.exists() else None
+    patch = patch_file.read_text() if patch_file.exists() else ""
+    return _meta(result_event, patch, iid)
 
 
 def run_harness(predictions_path: str, ids: list[str], workers: int, run_id: str) -> int:
@@ -186,6 +296,10 @@ def main() -> None:
     ap.add_argument("--timeout", type=int, default=900, help="per-instance agent wall-clock seconds")
     ap.add_argument("--workers", type=int, default=4, help="harness max_workers (parallel Docker scoring)")
     ap.add_argument("--run-id", default="codingmalo-smoke")
+    ap.add_argument("--agent-in-docker", action="store_true",
+                    help="run the agent INSIDE the SWE-bench instance image (tests runnable), not a bare clone")
+    ap.add_argument("--extra-prompt-file", default=None,
+                    help="file whose contents are injected via --append-system-prompt (A/B prompt variants, same dist)")
     args = ap.parse_args()
 
     if args.list_repos:
@@ -212,10 +326,25 @@ def main() -> None:
     else:
         if not CLI.exists():
             sys.exit(f"built CLI not found at {CLI} — run `npm run build`")
-        if not os.environ.get("DEEPSEEK_API_KEY") and not os.environ.get("ANTHROPIC_API_KEY") and not os.environ.get("OPENAI_API_KEY"):
+        if not any(os.environ.get(k) for k in KEY_ENVS):
             print("! warning: no model API key in env — agent runs will fail", flush=True)
+        if args.agent_in_docker:
+            # preflight: the cross-arch bind-mounts must exist on the host
+            if not (NODE_LINUX / "bin" / "node").exists():
+                sys.exit(f"missing linux-x64 node at {NODE_LINUX}/bin/node — run ./setup.sh (or see README)")
+            if not HOST_CONFIG.exists():
+                sys.exit(f"missing model config at {HOST_CONFIG} — needed to map --model to a provider")
+            print(f"agent mode: docker (tests runnable inside the instance image)\n", flush=True)
+        extra_prompt = pathlib.Path(args.extra_prompt_file).read_text() if args.extra_prompt_file else None
+        if extra_prompt:
+            print(f"append-system-prompt: {args.extra_prompt_file} ({len(extra_prompt)} chars)\n", flush=True)
+        run = run_agent_docker if args.agent_in_docker else run_agent
         for r in rows:
-            metas[r["instance_id"]] = run_agent(r, args.model, args.max_turns, args.timeout)
+            try:
+                metas[r["instance_id"]] = run(r, args.model, args.max_turns, args.timeout, extra_prompt)
+            except Exception as exc:  # one bad instance (image pull, docker error) shouldn't kill the batch
+                print(f"    ! {r['instance_id']} failed: {exc}", flush=True)
+                metas[r["instance_id"]] = {"patch": "", "turns": None, "error_kind": "runner_error", "usage": {}}
         preds = [
             {"instance_id": iid, "model_name_or_path": MODEL_TAG, "model_patch": m["patch"]}
             for iid, m in metas.items()

@@ -23,6 +23,9 @@ python3 -m venv .venv
 .venv/bin/pip install -U pip swebench datasets
 ```
 
+Run `./setup.sh` once (creates `.venv`, installs the harness, and downloads a linux-x64 node binary
+used by docker-agent mode).
+
 ## Use
 
 ```bash
@@ -47,6 +50,29 @@ predictions go to `predictions.<run-id>.jsonl`.
 
 > Disk: each repo's eval image is GBs; a 20-task spread touches ~all 12 repos. `docker image prune`
 > after a run to reclaim space.
+
+### Two agent environments
+
+- **Default (host clone):** clone the repo @ base_commit on the host and run the agent there. Fast,
+  but the repo's **dependencies are not installed**, so the agent cannot run the test suite.
+- **`--agent-in-docker`:** run the agent **inside the SWE-bench instance image** — the same image the
+  scorer uses, with `/testbed` @ base_commit and the `testbed` conda env (all deps installed). Here
+  the agent's tests are **runnable**. The pure-JS agent is bind-mounted cross-arch (`dist/` +
+  `node_modules/` + the linux-x64 node + your `~/.codingmalo/config.json`); no rebuild inside the
+  container. Heavier (image pulls are GBs each; runs under emulation on Apple Silicon).
+
+```bash
+# baseline vs a prompt variant, SAME build — differ only by --extra-prompt-file (--append-system-prompt)
+.venv/bin/python run_smoke.py --subset 20 --agent-in-docker --model deepseek-v4-flash \
+  --max-turns 40 --run-id docker-baseline
+.venv/bin/python run_smoke.py --subset 20 --agent-in-docker --model deepseek-v4-flash \
+  --max-turns 40 --run-id docker-verify --extra-prompt-file prompts/verify-before-done.txt
+```
+
+> **Held-out tests:** SWE-bench's graded `FAIL_TO_PASS` tests are added by the gold `test_patch` and
+> are **not** in `/testbed` at base_commit. So "verify by running tests" catches regressions
+> (`PASS_TO_PASS`), crashes, and anything the agent can reproduce from the issue — but it cannot
+> directly check the held-out `FAIL_TO_PASS` unless the agent writes its own reproduction.
 
 ## How the agent is invoked (per instance)
 

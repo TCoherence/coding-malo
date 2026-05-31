@@ -3,3 +3,5 @@ logs/
 predictions.*.jsonl
 *.json
 !*.example.json
+.node-linux-x64/
+analysis/gold/
