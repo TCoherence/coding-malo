@@ -7,21 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- **System prompt — "verify before you finish" workflow.** The base prompt now guides a four-step
-  loop whenever the agent changes code: (1) understand first — read the tests/hints to pin the exact
-  API names, signatures, and output format rather than inventing them; (2) make the minimal change;
-  (3) cover every site — sweep for sibling call-sites and symmetric paths (read↔write, all asserts of
-  a kind) after the first edit; (4) verify by running the relevant tests or reproducing the issue
-  before declaring done. Targets the v0.1.0 SWE-bench Lite failure mode where the agent located and
-  edited the right code cleanly but stopped at an unverified, partial fix
-  (see `eval/swebench/analysis/v0.1.0-failure-analysis.md`).
-
-### Fixed
-
-- System prompt referenced `Grep`/`Glob` tools that aren't registered in the builtin set; it now
-  points search at `Bash` (grep/find), matching the tools actually available to the model.
+_Nothing yet._
 
 ## [0.1.0] — 2026-05-29
 
