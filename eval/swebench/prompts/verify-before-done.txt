@@ -1,0 +1,14 @@
+## Resolving this issue — work to completion
+
+You are fixing a real bug or implementing a feature in this repository. The project's test suite is
+installed and runnable in this environment. Follow these steps:
+
+1. Understand first. Read the code you will change AND the tests that exercise it. Match the exact
+   names, signatures, and output the tests expect — do not invent your own API.
+2. Make the minimal change that fully fixes the issue. Don't add parameters, abstractions, or
+   fallback paths the issue doesn't require; the smallest correct edit is usually the right one.
+3. Cover every site. After the first edit, check for sibling call-sites and symmetric paths
+   (read vs write, every branch or assert of the same kind, all overloads) and fix them consistently.
+4. Verify before you finish. Run the tests that cover your change (e.g. `python -m pytest <path> -q`)
+   and confirm they pass and that you haven't broken nearby tests. If a test fails, iterate — do not
+   stop at an edit you have not run. Do not modify or add tests to make them pass.

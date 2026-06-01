@@ -17,11 +17,14 @@ const PRICING: Record<string, ModelPricing> = {
   "claude-opus-4-8": { inputPerMtok: 15, outputPerMtok: 75, cacheReadPerMtok: 1.5, cacheWritePerMtok: 18.75 },
   "claude-sonnet-4-6": { inputPerMtok: 3, outputPerMtok: 15, cacheReadPerMtok: 0.3, cacheWritePerMtok: 3.75 },
   "claude-haiku-4-5": { inputPerMtok: 1, outputPerMtok: 5, cacheReadPerMtok: 0.1, cacheWritePerMtok: 1.25 },
-  // DeepSeek (cacheRead = cache-hit price; DeepSeek has no separate cache-write charge)
-  "deepseek-chat": { inputPerMtok: 0.27, outputPerMtok: 1.1, cacheReadPerMtok: 0.07, cacheWritePerMtok: 0.27 },
-  "deepseek-reasoner": { inputPerMtok: 0.55, outputPerMtok: 2.19, cacheReadPerMtok: 0.14, cacheWritePerMtok: 0.55 },
-  // 占位估算 — 请按 DeepSeek 实际定价调整（成本仅用于 TUI 显示，不影响功能）
-  "deepseek-v4-flash": { inputPerMtok: 0.1, outputPerMtok: 0.4, cacheReadPerMtok: 0.02, cacheWritePerMtok: 0.1 },
+  // DeepSeek — https://api-docs.deepseek.com/quick_start/pricing (USD/Mtok, as of 2026-05).
+  // cacheRead = cache-hit price; cache-miss is billed as full input (no separate cache-write charge).
+  // deepseek-chat / deepseek-reasoner are legacy aliases of deepseek-v4-flash (identical pricing).
+  "deepseek-v4-flash": { inputPerMtok: 0.14, outputPerMtok: 0.28, cacheReadPerMtok: 0.0028, cacheWritePerMtok: 0.14 },
+  // deepseek-v4-pro: post-2026/05/31 permanent rate (1/4 of the original 1.74/3.48/0.0145).
+  "deepseek-v4-pro": { inputPerMtok: 0.435, outputPerMtok: 0.87, cacheReadPerMtok: 0.003625, cacheWritePerMtok: 0.435 },
+  "deepseek-chat": { inputPerMtok: 0.14, outputPerMtok: 0.28, cacheReadPerMtok: 0.0028, cacheWritePerMtok: 0.14 },
+  "deepseek-reasoner": { inputPerMtok: 0.14, outputPerMtok: 0.28, cacheReadPerMtok: 0.0028, cacheWritePerMtok: 0.14 },
   // OpenAI
   "gpt-4o": { inputPerMtok: 2.5, outputPerMtok: 10, cacheReadPerMtok: 1.25, cacheWritePerMtok: 2.5 },
   "gpt-4o-mini": { inputPerMtok: 0.15, outputPerMtok: 0.6, cacheReadPerMtok: 0.075, cacheWritePerMtok: 0.15 },

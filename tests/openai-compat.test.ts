@@ -80,7 +80,7 @@ describe("OpenAICompatProvider", () => {
     expect(JSON.parse(args)).toEqual({ command: "ls" });
 
     const usage = events.find((e) => e.type === "usage") as Extract<ProviderStreamEvent, { type: "usage" }>;
-    expect(usage.usage.inputTokens).toBe(12);
+    expect(usage.usage.inputTokens).toBe(8); // 12 prompt_tokens − 4 cached = cache-miss (no double-count)
     expect(usage.usage.outputTokens).toBe(8);
     expect(usage.usage.cacheReadInputTokens).toBe(4);
 
