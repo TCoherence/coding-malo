@@ -6,10 +6,12 @@ Each entry: a single-variable change vs the standing baseline, measured on the *
 > ⚠️ Variance caveat: `deepseek-v4-flash` is non-deterministic, and 20 tasks give a wide CI (~±11% 1σ).
 > A single run shows direction, not a precise delta. Trust a result more when a mechanism explains it.
 
-| # | change | resolved | Δ vs baseline | cost (20) | turns | verdict |
+| # | change | env | resolved | Δ | cost (20) | verdict |
 |---|---|---|---|---|---|---|
-| — | **v0.1.0 baseline** (generic prompt) | **12/20 = 60%** | — | $0.069 | — | standing baseline |
-| 1 | v0.1.x "verify before done" prompt | 8/20 = 40% | **−20pt** | $0.082 | +~18% | ❌ reverted |
+| — | **v0.1.0 baseline** (generic prompt) | host (no deps) | **12/20 = 60%** | — | $0.069 | standing baseline |
+| 1 | "verify before done" prompt (baked in) | host (no deps) | 8/20 = 40% | −20pt | $0.082 | ❌ reverted (confounded by depless env) |
+| 2a | baseline prompt, **agent-in-docker** | docker (deps) | 11/20 = 55% | ≈baseline (−1, noise) | $0.068 | docker mode validated ≈ host |
+| 2b | verify prompt (`--append`), agent-in-docker | docker (deps) | 10/20 = 50% | **−1 vs docker-baseline** | $0.085 (+26%) | ❌ verify prompt doesn't help v4-flash |
 
 ---
 
@@ -44,9 +46,34 @@ or run inside SWE-bench's prepared Docker image).
 - `run_smoke.py` now writes `.git/info/exclude` for test/build junk so `git add -A` can't sweep
   `.hypothesis/`, `__pycache__/`, `*.egg-info`, etc. into the captured diff.
 
-**Open follow-ups (pick a direction before more prompt tuning):**
-- **Refined prompt:** keep only the read-only levers (read tests/hints to pin the API, minimal
-  change, cover sibling sites); **drop "run tests"** until the env supports it. Re-measure.
-- **Eval infra:** make tests runnable per instance (install deps / use the SWE-bench image) so the
-  self-verification lever can be measured at all. Likely the higher-value fix.
-- **Noise control:** run baseline + candidate 3× each to bound variance before trusting a delta.
+## Exp 2 — docker-agent mode + verify prompt in a faithful env (deps installed)
+
+Built `--agent-in-docker` (agent runs inside the SWE-bench instance image; tests runnable) to remove
+exp-1's confound. Then A/B'd baseline vs the verify prompt (injected via `--append-system-prompt`,
+same dist) on the same 20.
+
+- **2a docker-baseline = 11/20 (55%)** — matches host-baseline (12/20) within 1 instance (only
+  `sphinx-10325` differs; run-to-run noise). **Confirms docker mode ≈ host regime** for the baseline
+  prompt, and validates the infra.
+- **2b docker-verify = 10/20 (50%)** — vs docker-baseline: **lost `seaborn-2848`, gained nothing,
+  +26% cost, +1 empty patch.** The verify prompt does **not** help `deepseek-v4-flash` even when
+  tests are runnable.
+
+**Conclusion — "verify before done" is not the lever for v4-flash on Lite.** Refuted in BOTH
+environments (host −20pt confounded; docker −1pt clean). Why it doesn't pay off here:
+- **Held-out tests:** the graded `FAIL_TO_PASS` aren't in the repo at base_commit, so running the
+  existing suite can't catch the actual graded failure; "verify" mostly adds turns/cost.
+- **Weak model:** v4-flash spends the extra deliberation wandering (more turns, occasional empty/worse
+  patch) rather than converging.
+
+**Where this leaves optimization (no clear prompt lever for v4-flash):**
+- **Repro-first scaffold** (more promising than "run tests"): have the agent *write a failing
+  reproduction from the issue text*, then make it pass — this creates the check that the held-out
+  test would provide. More involved than a prompt nudge.
+- **Model tier:** re-run the SAME A/B on `deepseek-v4-pro` / reasoner — a stronger model may actually
+  use the verify/completeness levers (and justify the cost). Cheap to try now that infra exists.
+- **Noise control:** the deltas here are 1 instance on 20 (±11% 1σ). Any future candidate worth
+  shipping should be confirmed with multi-seed or the full Lite-300.
+
+The base system prompt stays at the v0.1.0 baseline. `prompts/verify-before-done.txt` is retained as
+the tested (negative) artifact, reusable for the model-tier A/B.
