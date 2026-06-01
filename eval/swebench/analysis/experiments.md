@@ -12,6 +12,8 @@ Each entry: a single-variable change vs the standing baseline, measured on the *
 | 1 | "verify before done" prompt (baked in) | host (no deps) | 8/20 = 40% | −20pt | $0.082 | ❌ reverted (confounded by depless env) |
 | 2a | baseline prompt, **agent-in-docker** | docker (deps) | 11/20 = 55% | ≈baseline (−1, noise) | $0.068 | docker mode validated ≈ host |
 | 2b | verify prompt (`--append`), agent-in-docker | docker (deps) | 10/20 = 50% | **−1 vs docker-baseline** | $0.085 (+26%) | ❌ verify prompt doesn't help v4-flash |
+| 3a | **deepseek-v4-pro** baseline, agent-in-docker | docker (deps) | 9/20 = 45% | −2 vs flash-docker | $0.274 (~4×) | ❌ pro worse than flash here |
+| 3b | v4-pro + verify prompt, agent-in-docker | docker (deps) | 9/20 = 45% | 0 vs pro-baseline | $0.255 | ❌ verify doesn't help v4-pro either |
 
 ---
 
@@ -77,3 +79,32 @@ environments (host −20pt confounded; docker −1pt clean). Why it doesn't pay 
 
 The base system prompt stays at the v0.1.0 baseline. `prompts/verify-before-done.txt` is retained as
 the tested (negative) artifact, reusable for the model-tier A/B.
+
+## Exp 3 — model tier (deepseek-v4-pro), same docker A/B
+
+Does a stronger/pricier model use the verify/completeness levers? Re-ran the exact docker A/B on
+`deepseek-v4-pro` (~4× the per-token price), reusing the same 20 instance images.
+
+- **3a pro-baseline = 9/20 (45%)**, $0.274 (~4× flash's $0.068).
+- **3b pro-verify = 9/20 (45%)**, $0.255 (+1 empty patch). Verify makes no difference for pro either.
+
+**The five resolved sets are monotonically nested** (each ⊆ the one with a higher count):
+`pro (9) ⊆ flash-docker-verify (10) ⊆ flash-docker (11) ⊆ flash-host (12)`. All five share the same
+core 9. flash additionally solves seaborn-2848 / requests-1963 / sphinx-10325; **v4-pro solves a
+strict subset of flash and adds nothing** — it missed seaborn-2848 and requests-1963 that flash got.
+
+**Conclusions (two clean negatives):**
+1. **The verify-before-done prompt does not help** — refuted on v4-flash AND v4-pro.
+2. **v4-pro is not worth it here** — strictly worse than v4-flash on this subset at ~4× cost. Likely
+   over-thinking simple Lite tasks (the same wander/over-edit failure mode), and/or noise — but
+   clearly not a win.
+
+> Variance: 20 tasks, ±~11% (1σ); the exact 12/11/10/9 ordering spans ~3 instances. But the strict
+> *nesting* (no run ever solves something a better-scoring run missed) is a strong structural signal,
+> not the pattern you'd expect from pure noise.
+
+**Net:** the cheap optimization knobs are exhausted — neither a prompt nudge nor a bigger model beats
+**v4-flash + the baseline prompt (~55–60%)**, which is the cost/quality sweet spot. Getting higher on
+this scaffold needs a *structural* change, not a knob twist. Best remaining candidate: a **repro-first
+scaffold** (agent writes a failing reproduction from the issue, then makes it pass — supplying the
+check the held-out test would). That's real work; worth a deliberate decision before starting.
